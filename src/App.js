@@ -520,25 +520,33 @@ export default function FinanceTrackerApp() {
                 <input type="number" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} className="w-full px-3 py-2 border rounded-lg mt-1 text-sm" placeholder="0.00" />
               </div>
               {formData.type === 'expense' && (
-                <>
-                  <div>
-                    <label className="text-sm font-medium">Category</label>
-                    <select value={formData.category || ''} onChange={(e) => setFormData({ ...formData, category: parseInt(e.target.value) })} className="w-full px-3 py-2 border rounded-lg mt-1 text-sm">
-                      <option value="">Select a category</option>
-                      {categories.filter(c => !c.parentId).map(cat => <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>)}
-                    </select>
-                  </div>
-                  {formData.category && categories.some(sc => sc.parentId === parseInt(formData.category)) && (
-                    <div>
-                      <label className="text-sm font-medium">Subcategory (Optional)</label>
-                      <select value={formData.category || ''} onChange={(e) => setFormData({ ...formData, category: parseInt(e.target.value) })} className="w-full px-3 py-2 border rounded-lg mt-1 text-sm">
-                        <option value={parseInt(formData.category)}>{categories.find(c => c.id === parseInt(formData.category))?.name}</option>
-                        {categories.filter(sc => sc.parentId === parseInt(formData.category)).map(subcat => <option key={subcat.id} value={subcat.id}>{subcat.icon} {subcat.name}</option>)}
-                      </select>
-                    </div>
-                  )}
-                </>
-              )}
+  <>
+    <div>
+      <label className="text-sm font-medium">Category</label>
+      <select value={(() => {
+        const selectedCat = categories.find(c => c.id === formData.category);
+        return selectedCat?.parentId || formData.category || '';
+      })()} onChange={(e) => setFormData({ ...formData, category: parseInt(e.target.value) })} className="w-full px-3 py-2 border rounded-lg mt-1 text-sm">
+        <option value="">Select a category</option>
+        {categories.filter(c => !c.parentId).map(cat => <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>)}
+      </select>
+    </div>
+    {formData.category && (() => {
+      const selectedCat = categories.find(c => c.id === formData.category);
+      const mainCatId = selectedCat?.parentId || formData.category;
+      const subcats = categories.filter(sc => sc.parentId === mainCatId);
+      return subcats.length > 0 ? (
+        <div>
+          <label className="text-sm font-medium">Subcategory (Optional)</label>
+          <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: parseInt(e.target.value) })} className="w-full px-3 py-2 border rounded-lg mt-1 text-sm">
+            <option value={mainCatId}>{categories.find(c => c.id === mainCatId)?.name}</option>
+            {subcats.map(subcat => <option key={subcat.id} value={subcat.id}>{subcat.icon} {subcat.name}</option>)}
+          </select>
+        </div>
+      ) : null;
+    })()}
+  </>
+)}
               <div>
                 <label className="text-sm font-medium">Account</label>
                 <select value={formData.accountId} onChange={(e) => setFormData({ ...formData, accountId: parseInt(e.target.value) })} className="w-full px-3 py-2 border rounded-lg mt-1 text-sm">
