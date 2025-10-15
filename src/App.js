@@ -712,3 +712,5 @@ export default function FinanceTrackerApp() {
     </div>
   );
 }
+
+// auth
