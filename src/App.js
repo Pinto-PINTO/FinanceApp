@@ -13,10 +13,12 @@ import {
   AlertCircle,
   ChevronLeft,
 } from "lucide-react";
+import { useEffect } from "react";
+import * as dbService from "./dbService";
 
 // piumi123fernando
 export default function FinanceTrackerApp({ user, onLogout }) {
-  const [currentScreen, setCurrentScreen] = useState('home');
+  const [currentScreen, setCurrentScreen] = useState("home");
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
@@ -29,262 +31,317 @@ export default function FinanceTrackerApp({ user, onLogout }) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
 
-  const emojis = ['🍔', '🚗', '🛍️', '📄', '🎬', '🏥', '🛒', '💼', '✈️', '📚', '🎮', '💇', '🏋️', '🍕', '⛽', '🏠', '📱', '🎁', '💳', '🎓', '📺', '🌳', '🚴', '⚡', '🎪', '🍷', '🎸', '🎨', '🔧', '🌸'];
+  const emojis = [
+    "🍔",
+    "🚗",
+    "🛍️",
+    "📄",
+    "🎬",
+    "🏥",
+    "🛒",
+    "💼",
+    "✈️",
+    "📚",
+    "🎮",
+    "💇",
+    "🏋️",
+    "🍕",
+    "⛽",
+    "🏠",
+    "📱",
+    "🎁",
+    "💳",
+    "🎓",
+    "📺",
+    "🌳",
+    "🚴",
+    "⚡",
+    "🎪",
+    "🍷",
+    "🎸",
+    "🎨",
+    "🔧",
+    "🌸",
+  ];
 
-  const [categories, setCategories] = useState([
-    // NEEDS
-    {
-      id: 1,
-      name: "Transport",
-      icon: "🚗",
-      color: "#4ECDC4",
-      type: "need",
-      budget: 200,
-      parentId: null,
-    },
-    {
-      id: 2,
-      name: "Food",
-      icon: "🍔",
-      color: "#FF6B6B",
-      type: "need",
-      budget: 300,
-      parentId: null,
-    },
-    {
-      id: 3,
-      name: "Housing",
-      icon: "🏠",
-      color: "#45B7D1",
-      type: "need",
-      budget: 800,
-      parentId: null,
-    },
-    {
-      id: 4,
-      name: "Utilities",
-      icon: "💡",
-      color: "#FFD93D",
-      type: "need",
-      budget: 150,
-      parentId: null,
-    },
-    {
-      id: 5,
-      name: "Healthcare",
-      icon: "⚕️",
-      color: "#6BCB77",
-      type: "need",
-      budget: 120,
-      parentId: null,
-    },
-    {
-      id: 6,
-      name: "Insurance",
-      icon: "🛡️",
-      color: "#9B5DE5",
-      type: "need",
-      budget: 100,
-      parentId: null,
-    },
+  const [categories, setCategories] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
-    // WANTS
-    {
-      id: 8,
-      name: "Entertainment",
-      icon: "🎬",
-      color: "#F38181",
-      type: "want",
-      budget: 100,
-      parentId: null,
-    },
-    {
-      id: 9,
-      name: "Shopping",
-      icon: "🛍️",
-      color: "#F7B801",
-      type: "want",
-      budget: 150,
-      parentId: null,
-    },
-    {
-      id: 10,
-      name: "Travel",
-      icon: "✈️",
-      color: "#8AC926",
-      type: "want",
-      budget: 250,
-      parentId: null,
-    },
-    {
-      id: 11,
-      name: "Gifts & Donations",
-      icon: "🎁",
-      color: "#FF9F1C",
-      type: "want",
-      budget: 80,
-      parentId: null,
-    },
-    {
-      id: 12,
-      name: "Personal Care",
-      icon: "💅",
-      color: "#E36414",
-      type: "want",
-      budget: 60,
-      parentId: null,
-    },
-    {
-      id: 13,
-      name: "Hobbies",
-      icon: "🎨",
-      color: "#F72585",
-      type: "want",
-      budget: 90,
-      parentId: null,
-    },
-  ]);
+  // Load data from Firestore on mount
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user) return;
 
-  const [transactions, setTransactions] = useState([
-    { id: 1, type: 'income', amount: 3500, category: null, date: '2025-10-01', note: 'Salary', accountId: 1 },
-    { id: 2, type: 'expense', amount: 30, category: 4, date: '2025-10-05', note: 'Bus fare', accountId: 1 },
-    { id: 3, type: 'expense', amount: 50, category: 5, date: '2025-10-06', note: 'Uber ride', accountId: 1 },
-    { id: 4, type: 'expense', amount: 120, category: 3, date: '2025-10-06', note: 'Movie', accountId: 1 },
-    { id: 5, type: 'expense', amount: 60, category: 4, date: '2025-10-07', note: 'Bus fare', accountId: 2 },
-  ]);
+      try {
+        const [categoriesData, transactionsData, accountsData] =
+          await Promise.all([
+            dbService.getCategories(user.uid),
+            dbService.getTransactions(user.uid),
+            dbService.getAccounts(user.uid),
+          ]);
 
-  const [accounts, setAccounts] = useState([
-    { id: 1, name: 'Checking', balance: 2500, color: '#4ECDC4', type: 'checking' },
-    { id: 2, name: 'Savings', balance: 5000, color: '#95E1D3', type: 'savings' },
-  ]);
+        setCategories(categoriesData);
+        setTransactions(transactionsData);
+        setAccounts(accountsData);
+        setDataLoaded(true);
+      } catch (error) {
+        console.error("Error loading data:", error);
+      }
+    };
+
+    loadData();
+  }, [user]);
 
   const [formData, setFormData] = useState({
-    type: 'expense',
-    amount: '',
-    category: '',
-    date: new Date().toISOString().split('T')[0],
-    note: '',
-    accountId: 1
+    type: "expense",
+    amount: "",
+    category: "",
+    date: new Date().toISOString().split("T")[0],
+    note: "",
+    accountId: 1,
   });
 
   const [categoryFormData, setCategoryFormData] = useState({
-    name: '',
-    icon: '',
-    color: '#95E1D3',
-    type: 'need',
-    budget: 0
+    name: "",
+    icon: "",
+    color: "#95E1D3",
+    type: "need",
+    budget: 0,
   });
 
   const [subcategoryFormData, setSubcategoryFormData] = useState({
-    name: '',
-    icon: '',
-    budget: 0
+    name: "",
+    icon: "",
+    budget: 0,
   });
 
   const [accountFormData, setAccountFormData] = useState({
-    name: '',
-    balance: '',
-    color: '#4ECDC4',
-    type: 'checking'
+    name: "",
+    balance: "",
+    color: "#4ECDC4",
+    type: "checking",
   });
 
   const stats = useMemo(() => {
-    const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-    const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-    const totalAccountBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+    const totalIncome = transactions
+      .filter((t) => t.type === "income")
+      .reduce((sum, t) => sum + t.amount, 0);
+    const totalExpenses = transactions
+      .filter((t) => t.type === "expense")
+      .reduce((sum, t) => sum + t.amount, 0);
+    const totalAccountBalance = accounts.reduce(
+      (sum, acc) => sum + acc.balance,
+      0
+    );
 
-    const categorySpending = categories.filter(c => !c.parentId).map(cat => {
-      const directSpent = transactions.filter(t => t.type === 'expense' && t.category === cat.id).reduce((sum, t) => sum + t.amount, 0);
-      const subcats = categories.filter(sc => sc.parentId === cat.id);
-      const subSpent = transactions.filter(t => t.type === 'expense' && subcats.find(sc => sc.id === t.category)).reduce((sum, t) => sum + t.amount, 0);
-      const totalSpent = directSpent + subSpent;
-      
-      return {
-        ...cat,
-        spent: totalSpent,
-        remaining: Math.max(0, cat.budget - totalSpent),
-        percentage: cat.budget > 0 ? (totalSpent / cat.budget) * 100 : 0
-      };
-    });
+    const categorySpending = categories
+      .filter((c) => !c.parentId)
+      .map((cat) => {
+        const directSpent = transactions
+          .filter((t) => t.type === "expense" && t.category === cat.id)
+          .reduce((sum, t) => sum + t.amount, 0);
+        const subcats = categories.filter((sc) => sc.parentId === cat.id);
+        const subSpent = transactions
+          .filter(
+            (t) =>
+              t.type === "expense" && subcats.find((sc) => sc.id === t.category)
+          )
+          .reduce((sum, t) => sum + t.amount, 0);
+        const totalSpent = directSpent + subSpent;
 
-    return { totalIncome, totalExpenses, totalAccountBalance, categorySpending };
+        return {
+          ...cat,
+          spent: totalSpent,
+          remaining: Math.max(0, cat.budget - totalSpent),
+          percentage: cat.budget > 0 ? (totalSpent / cat.budget) * 100 : 0,
+        };
+      });
+
+    return {
+      totalIncome,
+      totalExpenses,
+      totalAccountBalance,
+      categorySpending,
+    };
   }, [transactions, categories, accounts]);
 
-  const handleAddTransaction = () => {
-    if (!formData.amount || formData.amount <= 0 || !formData.category) return;
+  const handleAddTransaction = async () => {
+    if (
+      !formData.amount ||
+      formData.amount <= 0 ||
+      (formData.type === "expense" && !formData.category)
+    )
+      return;
 
-    if (editingTransaction) {
-      setTransactions(transactions.map(t => 
-        t.id === editingTransaction.id 
-          ? { ...formData, id: t.id, amount: parseFloat(formData.amount) }
-          : t
-      ));
-      setEditingTransaction(null);
-    } else {
-      setTransactions([{ ...formData, id: Date.now(), amount: parseFloat(formData.amount) }, ...transactions]);
+    const transactionData = {
+      ...formData,
+      amount: parseFloat(formData.amount),
+    };
+
+    try {
+      if (editingTransaction) {
+        await dbService.updateTransaction(
+          user.uid,
+          editingTransaction.id,
+          transactionData
+        );
+        setTransactions(
+          transactions.map((t) =>
+            t.id === editingTransaction.id
+              ? { ...transactionData, id: t.id }
+              : t
+          )
+        );
+        setEditingTransaction(null);
+      } else {
+        const newTransaction = await dbService.addTransaction(
+          user.uid,
+          transactionData
+        );
+        setTransactions([newTransaction, ...transactions]);
+      }
+
+      setFormData({
+        type: "expense",
+        amount: "",
+        category: "",
+        date: new Date().toISOString().split("T")[0],
+        note: "",
+        accountId: accounts[0]?.id || 1,
+      });
+      setShowAddModal(false);
+    } catch (error) {
+      console.error("Error saving transaction:", error);
+      alert("Error saving transaction. Please try again.");
     }
-
-    setFormData({ type: 'expense', amount: '', category: '', date: new Date().toISOString().split('T')[0], note: '', accountId: 1 });
-    setShowAddModal(false);
   };
 
-  const handleAddCategory = () => {
-    if (!categoryFormData.name || !categoryFormData.budget || !categoryFormData.icon) return;
+  const handleAddCategory = async () => {
+    if (
+      !categoryFormData.name ||
+      !categoryFormData.budget ||
+      !categoryFormData.icon
+    )
+      return;
 
-    if (editingCategory) {
-      setCategories(categories.map(c => 
-        c.id === editingCategory.id ? { ...editingCategory, ...categoryFormData } : c
-      ));
-      setEditingCategory(null);
-    } else {
-      setCategories([...categories, { id: Date.now(), ...categoryFormData, parentId: null }]);
+    try {
+      if (editingCategory) {
+        await dbService.updateCategory(
+          user.uid,
+          editingCategory.id,
+          categoryFormData
+        );
+        setCategories(
+          categories.map((c) =>
+            c.id === editingCategory.id
+              ? { ...editingCategory, ...categoryFormData }
+              : c
+          )
+        );
+        setEditingCategory(null);
+      } else {
+        const newCategory = await dbService.addCategory(user.uid, {
+          ...categoryFormData,
+          parentId: null,
+        });
+        setCategories([...categories, newCategory]);
+      }
+
+      setCategoryFormData({
+        name: "",
+        icon: "",
+        color: "#95E1D3",
+        type: "need",
+        budget: 0,
+      });
+      setShowCategoryForm(false);
+    } catch (error) {
+      console.error("Error saving category:", error);
+      alert("Error saving category. Please try again.");
     }
-
-    setCategoryFormData({ name: '', icon: '', color: '#95E1D3', type: 'need', budget: 0 });
-    setShowCategoryForm(false);
   };
 
-  const handleAddSubcategory = () => {
-    if (!subcategoryFormData.name || !subcategoryFormData.budget || !subcategoryFormData.icon) return;
+  const handleAddSubcategory = async () => {
+    if (
+      !subcategoryFormData.name ||
+      !subcategoryFormData.budget ||
+      !subcategoryFormData.icon
+    )
+      return;
 
-    if (editingSubcategory) {
-      setCategories(categories.map(c => 
-        c.id === editingSubcategory.id ? { ...editingSubcategory, ...subcategoryFormData } : c
-      ));
-      setEditingSubcategory(null);
-    } else {
-      const parentCat = categories.find(c => c.id === selectedCategoryId);
-      setCategories([...categories, { 
-        id: Date.now(), 
-        name: subcategoryFormData.name,
-        icon: subcategoryFormData.icon,
-        budget: subcategoryFormData.budget,
-        color: parentCat.color,
-        type: parentCat.type,
-        parentId: selectedCategoryId 
-      }]);
+    try {
+      if (editingSubcategory) {
+        await dbService.updateCategory(
+          user.uid,
+          editingSubcategory.id,
+          subcategoryFormData
+        );
+        setCategories(
+          categories.map((c) =>
+            c.id === editingSubcategory.id
+              ? { ...editingSubcategory, ...subcategoryFormData }
+              : c
+          )
+        );
+        setEditingSubcategory(null);
+      } else {
+        const parentCat = categories.find((c) => c.id === selectedCategoryId);
+        const newSubcategory = await dbService.addCategory(user.uid, {
+          name: subcategoryFormData.name,
+          icon: subcategoryFormData.icon,
+          budget: subcategoryFormData.budget,
+          color: parentCat.color,
+          type: parentCat.type,
+          parentId: selectedCategoryId,
+        });
+        setCategories([...categories, newSubcategory]);
+      }
+
+      setSubcategoryFormData({ name: "", icon: "", budget: 0 });
+      setShowSubcategoryForm(false);
+    } catch (error) {
+      console.error("Error saving subcategory:", error);
+      alert("Error saving subcategory. Please try again.");
     }
-
-    setSubcategoryFormData({ name: '', icon: '', budget: 0 });
-    setShowSubcategoryForm(false);
   };
 
-  const handleAddAccount = () => {
+  const handleAddAccount = async () => {
     if (!accountFormData.name || !accountFormData.balance) return;
 
-    if (editingAccount) {
-      setAccounts(accounts.map(a => 
-        a.id === editingAccount.id 
-          ? { ...editingAccount, ...accountFormData, balance: parseFloat(accountFormData.balance) }
-          : a
-      ));
-      setEditingAccount(null);
-    } else {
-      setAccounts([...accounts, { id: Date.now(), ...accountFormData, balance: parseFloat(accountFormData.balance) }]);
-    }
+    const accountData = {
+      ...accountFormData,
+      balance: parseFloat(accountFormData.balance),
+    };
 
-    setAccountFormData({ name: '', balance: '', color: '#4ECDC4', type: 'checking' });
-    setShowAccountForm(false);
+    try {
+      if (editingAccount) {
+        await dbService.updateAccount(user.uid, editingAccount.id, accountData);
+        setAccounts(
+          accounts.map((a) =>
+            a.id === editingAccount.id
+              ? { ...editingAccount, ...accountData }
+              : a
+          )
+        );
+        setEditingAccount(null);
+      } else {
+        const newAccount = await dbService.addAccount(user.uid, accountData);
+        setAccounts([...accounts, newAccount]);
+      }
+
+      setAccountFormData({
+        name: "",
+        balance: "",
+        color: "#4ECDC4",
+        type: "checking",
+      });
+      setShowAccountForm(false);
+    } catch (error) {
+      console.error("Error saving account:", error);
+      alert("Error saving account. Please try again.");
+    }
   };
 
   const handlePasswordReset = async (newPassword) => {
@@ -486,11 +543,15 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                             <Edit2 size={16} />
                           </button>
                           <button
-                            onClick={() =>
+                            onClick={async () => {
+                              await dbService.deleteTransaction(
+                                user.uid,
+                                trans.id
+                              );
                               setTransactions(
                                 transactions.filter((t) => t.id !== trans.id)
-                              )
-                            }
+                              );
+                            }}
                             className="p-2 hover:bg-red-100 rounded"
                           >
                             <Trash2 size={16} className="text-red-600" />
@@ -760,14 +821,25 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                               <Edit2 size={16} />
                             </button>
                             <button
-                              onClick={() =>
+                              onClick={async () => {
+                                await dbService.deleteCategory(
+                                  user.uid,
+                                  cat.id
+                                );
+                                // Also delete all subcategories
+                                const subcatIds = categories
+                                  .filter((c) => c.parentId === cat.id)
+                                  .map((c) => c.id);
+                                for (const id of subcatIds) {
+                                  await dbService.deleteCategory(user.uid, id);
+                                }
                                 setCategories(
                                   categories.filter(
                                     (c) =>
                                       c.id !== cat.id && c.parentId !== cat.id
                                   )
-                                )
-                              }
+                                );
+                              }}
                               className="p-2 hover:bg-red-100 rounded"
                             >
                               <Trash2 size={16} className="text-red-600" />
@@ -810,13 +882,17 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                                       <Edit2 size={16} />
                                     </button>
                                     <button
-                                      onClick={() =>
+                                      onClick={async () => {
+                                        await dbService.deleteCategory(
+                                          user.uid,
+                                          subcat.id
+                                        );
                                         setCategories(
                                           categories.filter(
                                             (c) => c.id !== subcat.id
                                           )
-                                        )
-                                      }
+                                        );
+                                      }}
                                       className="p-2 hover:bg-red-100 rounded"
                                     >
                                       <Trash2
@@ -894,11 +970,12 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                             <Edit2 size={16} />
                           </button>
                           <button
-                            onClick={() =>
+                            onClick={async () => {
+                              await dbService.deleteAccount(user.uid, acc.id);
                               setAccounts(
                                 accounts.filter((a) => a.id !== acc.id)
-                              )
-                            }
+                              );
+                            }}
                             className="p-2 hover:bg-red-100 rounded"
                           >
                             <Trash2 size={16} className="text-red-600" />
