@@ -1,716 +1,966 @@
-import React, { useState, useMemo } from 'react';
-import { Wallet, Plus, X, Edit2, Trash2, Home, List, BarChart3, Settings, AlertCircle, ChevronLeft } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Wallet, Plus, X, Edit2, Trash2, Home, List, BarChart3, Settings, 
+  AlertCircle, ChevronLeft, TrendingUp, TrendingDown, Landmark, Banknote 
+} from 'lucide-react';
+import { 
+  initializeApp 
+} from 'firebase/app';
+import { 
+  getAuth, signInAnonymously, onAuthStateChanged 
+} from 'firebase/auth';
+import { 
+  getFirestore, collection, query, onSnapshot, addDoc, updateDoc, 
+  deleteDoc, doc, setLogLevel 
+} from 'firebase/firestore';
 
-// piumi123fernando
-export default function FinanceTrackerApp() {
+
+// =================================================================
+// FIREBASE MODULE EMULATION (from user's firebase.js)
+// NOTE: Since I cannot access your environment variables, I use 
+// mock values for a runnable, self-contained file.
+// In your local environment, process.env variables would be defined.
+// =================================================================
+
+// Mock Environment Variables (Simulating loading from process.env)
+const mockEnv = {
+    REACT_APP_FIREBASE_API_KEY: 'AIzaSyCzkRtdKY0HM8XzYsY_0kih1-Ck58_ommc',
+    REACT_APP_FIREBASE_AUTH_DOMAIN: 'financetrackerapp-75842.firebaseapp.com',
+    REACT_APP_FIREBASE_PROJECT_ID: 'financetrackerapp-75842',
+    REACT_APP_FIREBASE_STORAGE_BUCKET: 'financetrackerapp-75842.firebasestorage.app',
+    REACT_APP_FIREBASE_MESSAGING_SENDER_ID: '1051498012571',
+    REACT_APP_FIREBASE_APP_ID: '1:1051498012571:web:589ce9080de392e2d8b3e',
+    REACT_APP_FIREBASE_MEASUREMENT_ID: 'G-X85CK0RQ1E',
+};
+
+const firebaseConfig = {
+    apiKey: mockEnv.REACT_APP_FIREBASE_API_KEY,
+    authDomain: mockEnv.REACT_APP_FIREBASE_AUTH_DOMAIN,
+    projectId: mockEnv.REACT_APP_FIREBASE_PROJECT_ID,
+    storageBucket: mockEnv.REACT_APP_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: mockEnv.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+    appId: mockEnv.REACT_APP_FIREBASE_APP_ID,
+};
+
+// Initialize Firebase (Equivalent to your 'firebase.js' exports)
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+// Set debug logging for Firestore
+setLogLevel('debug');
+
+// =================================================================
+// APP COMPONENT START
+// =================================================================
+
+// Helper function to format currency
+const formatCurrency = (amount) => new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+}).format(amount);
+
+// Initial state for forms
+const initialTransactionFormData = {
+  description: '',
+  amount: 0,
+  type: 'expense', // 'income' or 'expense'
+  date: new Date().toISOString().substring(0, 10),
+  accountId: '',
+  categoryId: '',
+};
+
+const initialAccountFormData = {
+  name: '',
+  initialBalance: 0,
+  type: 'checking',
+  color: '#4ECDC4',
+};
+
+const initialCategoryFormData = {
+  name: '',
+  type: 'expense', // 'income' or 'expense'
+  icon: '💰', // Placeholder for a simple icon/emoji
+};
+
+
+export default function App() {
+  // --- FIREBASE STATE ---
+  const [userId, setUserId] = useState(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const appId = firebaseConfig.projectId; // Use project ID for artifact scoping
+
+  // --- APPLICATION DATA STATE ---
+  const [transactions, setTransactions] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  
+  // --- UI/FORM STATE ---
   const [currentScreen, setCurrentScreen] = useState('home');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showToast, setShowToast] = useState({ message: '', type: '', id: 0 });
+  
+  // Transaction Form State
+  const [transactionFormData, setTransactionFormData] = useState(initialTransactionFormData);
   const [editingTransaction, setEditingTransaction] = useState(null);
+
+  // Settings Form States
   const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [categoryFormData, setCategoryFormData] = useState(initialCategoryFormData);
   const [editingCategory, setEditingCategory] = useState(null);
+
   const [showAccountForm, setShowAccountForm] = useState(false);
+  const [accountFormData, setAccountFormData] = useState(initialAccountFormData);
   const [editingAccount, setEditingAccount] = useState(null);
-  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
-  const [showSubcategoryForm, setShowSubcategoryForm] = useState(false);
-  const [editingSubcategory, setEditingSubcategory] = useState(null);
 
-  const emojis = ['🍔', '🚗', '🛍️', '📄', '🎬', '🏥', '🛒', '💼', '✈️', '📚', '🎮', '💇', '🏋️', '🍕', '⛽', '🏠', '📱', '🎁', '💳', '🎓', '📺', '🌳', '🚴', '⚡', '🎪', '🍷', '🎸', '🎨', '🔧', '🌸'];
+  // --- FIREBASE AUTHENTICATION (Runs once on load) ---
+  useEffect(() => {
+    let unsubscribe;
+    
+    // 1. Authentication Listener (uses the globally initialized 'auth')
+    try {
+      unsubscribe = onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          setUserId(user.uid);
+          console.log("User authenticated:", user.uid);
+        } else {
+          // If no user is logged in, sign in anonymously as a fallback
+          const anonUser = await signInAnonymously(auth);
+          setUserId(anonUser.user.uid);
+          console.log("Signed in anonymously:", anonUser.user.uid);
+        }
+        setIsAuthReady(true);
+      });
+    } catch (error) {
+        console.error("Firebase Auth Error:", error);
+        setIsAuthReady(true);
+    }
 
-  const [categories, setCategories] = useState([
-    { id: 1, name: 'Transport', icon: '🚗', color: '#4ECDC4', type: 'need', budget: 200, parentId: null },
-    { id: 2, name: 'Food', icon: '🍔', color: '#FF6B6B', type: 'need', budget: 300, parentId: null },
-    { id: 3, name: 'Entertainment', icon: '🎬', color: '#F38181', type: 'want', budget: 100, parentId: null },
-    { id: 4, name: 'Bus', icon: '🚌', color: '#4ECDC4', type: 'need', budget: 80, parentId: 1 },
-    { id: 5, name: 'Uber', icon: '🚗', color: '#4ECDC4', type: 'need', budget: 120, parentId: 1 },
-  ]);
+    return () => {
+        if(unsubscribe) unsubscribe();
+    };
+  }, []); // Empty dependency array ensures it runs only once
 
-  const [transactions, setTransactions] = useState([
-    { id: 1, type: 'income', amount: 3500, category: null, date: '2025-10-01', note: 'Salary', accountId: 1 },
-    { id: 2, type: 'expense', amount: 30, category: 4, date: '2025-10-05', note: 'Bus fare', accountId: 1 },
-    { id: 3, type: 'expense', amount: 50, category: 5, date: '2025-10-06', note: 'Uber ride', accountId: 1 },
-    { id: 4, type: 'expense', amount: 120, category: 3, date: '2025-10-06', note: 'Movie', accountId: 1 },
-    { id: 5, type: 'expense', amount: 60, category: 4, date: '2025-10-07', note: 'Bus fare', accountId: 2 },
-  ]);
+  // --- FIREBASE DATA LISTENERS (Runs after successful authentication) ---
+  useEffect(() => {
+    // Only proceed if Firebase is ready and we have a userId
+    if (!userId || !isAuthReady) return;
 
-  const [accounts, setAccounts] = useState([
-    { id: 1, name: 'Checking', balance: 2500, color: '#4ECDC4', type: 'checking' },
-    { id: 2, name: 'Savings', balance: 5000, color: '#95E1D3', type: 'savings' },
-  ]);
+    // Base path for user-specific private data
+    // /artifacts/{appId}/users/{userId}/
+    const basePath = `artifacts/${appId}/users/${userId}`;
 
-  const [formData, setFormData] = useState({
-    type: 'expense',
-    amount: '',
-    category: '',
-    date: new Date().toISOString().split('T')[0],
-    note: '',
-    accountId: 1
-  });
+    // 1. Transactions Listener
+    const transactionsRef = collection(db, `${basePath}/transactions`);
+    const unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Sort by date (newest first)
+      setTransactions(data.sort((a, b) => new Date(b.date) - new Date(a.date)));
+      console.log("Transactions updated:", data.length);
+    }, (error) => console.error("Error fetching transactions:", error));
 
-  const [categoryFormData, setCategoryFormData] = useState({
-    name: '',
-    icon: '',
-    color: '#95E1D3',
-    type: 'need',
-    budget: 0
-  });
+    // 2. Accounts Listener
+    const accountsRef = collection(db, `${basePath}/accounts`);
+    const unsubscribeAccounts = onSnapshot(accountsRef, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAccounts(data);
+      console.log("Accounts updated:", data.length);
+    }, (error) => console.error("Error fetching accounts:", error));
 
-  const [subcategoryFormData, setSubcategoryFormData] = useState({
-    name: '',
-    icon: '',
-    budget: 0
-  });
+    // 3. Categories Listener
+    const categoriesRef = collection(db, `${basePath}/categories`);
+    const unsubscribeCategories = onSnapshot(categoriesRef, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCategories(data);
+      console.log("Categories updated:", data.length);
+    }, (error) => console.error("Error fetching categories:", error));
 
-  const [accountFormData, setAccountFormData] = useState({
-    name: '',
-    balance: '',
-    color: '#4ECDC4',
-    type: 'checking'
-  });
+    // Cleanup function
+    return () => {
+      unsubscribeTransactions();
+      unsubscribeAccounts();
+      unsubscribeCategories();
+    };
+  }, [userId, isAuthReady, appId]);
 
-  const stats = useMemo(() => {
-    const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-    const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-    const totalAccountBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+  // --- UTILITY AND DATA TRANSFORMATION ---
 
-    const categorySpending = categories.filter(c => !c.parentId).map(cat => {
-      const directSpent = transactions.filter(t => t.type === 'expense' && t.category === cat.id).reduce((sum, t) => sum + t.amount, 0);
-      const subcats = categories.filter(sc => sc.parentId === cat.id);
-      const subSpent = transactions.filter(t => t.type === 'expense' && subcats.find(sc => sc.id === t.category)).reduce((sum, t) => sum + t.amount, 0);
-      const totalSpent = directSpent + subSpent;
-      
-      return {
-        ...cat,
-        spent: totalSpent,
-        remaining: Math.max(0, cat.budget - totalSpent),
-        percentage: cat.budget > 0 ? (totalSpent / cat.budget) * 100 : 0
-      };
+  // Calculate Account Balances and Total Balance
+  const { totalBalance, accountBalances } = useMemo(() => {
+    const balances = accounts.reduce((acc, account) => {
+      acc[account.id] = account.initialBalance || 0;
+      return acc;
+    }, {});
+
+    transactions.forEach(t => {
+      if (t.accountId && balances.hasOwnProperty(t.accountId)) {
+        if (t.type === 'income') {
+          balances[t.accountId] += t.amount;
+        } else if (t.type === 'expense') {
+          balances[t.accountId] -= t.amount;
+        }
+      }
     });
 
-    return { totalIncome, totalExpenses, totalAccountBalance, categorySpending };
-  }, [transactions, categories, accounts]);
+    const overallBalance = Object.values(balances).reduce((sum, balance) => sum + balance, 0);
+    return {
+      totalBalance: overallBalance,
+      accountBalances: balances,
+    };
+  }, [accounts, transactions]);
 
-  const handleAddTransaction = () => {
-    if (!formData.amount || formData.amount <= 0 || !formData.category) return;
 
-    if (editingTransaction) {
-      setTransactions(transactions.map(t => 
-        t.id === editingTransaction.id 
-          ? { ...formData, id: t.id, amount: parseFloat(formData.amount) }
-          : t
-      ));
-      setEditingTransaction(null);
-    } else {
-      setTransactions([{ ...formData, id: Date.now(), amount: parseFloat(formData.amount) }, ...transactions]);
+  // --- TOAST NOTIFICATION ---
+  const showNotification = (message, type = 'success') => {
+    setShowToast({ message, type, id: Date.now() });
+    setTimeout(() => setShowToast({ message: '', type: '', id: 0 }), 3000);
+  };
+
+  // --- CRUD OPERATIONS ---
+
+  // Base function to get document path
+  const getDocPath = (collectionName, id) => doc(db, `artifacts/${appId}/users/${userId}/${collectionName}`, id);
+  // Base function to get collection path
+  const getCollectionPath = (collectionName) => collection(db, `artifacts/${appId}/users/${userId}/${collectionName}`);
+  
+
+  // --- Transactions CRUD ---
+  const handleAddOrUpdateTransaction = async () => {
+    if (!userId) return showNotification('Authentication failed. Please refresh.', 'error');
+    if (!transactionFormData.description || transactionFormData.amount <= 0 || !transactionFormData.accountId) {
+      return showNotification('Please fill out all required fields.', 'warning');
     }
+    
+    const dataToSave = {
+      ...transactionFormData,
+      amount: parseFloat(transactionFormData.amount),
+      // Add a creation timestamp if it's a new record
+      createdAt: editingTransaction ? editingTransaction.createdAt : new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
 
-    setFormData({ type: 'expense', amount: '', category: '', date: new Date().toISOString().split('T')[0], note: '', accountId: 1 });
+    try {
+      if (editingTransaction) {
+        await updateDoc(getDocPath('transactions', editingTransaction.id), dataToSave);
+        showNotification('Transaction updated successfully!', 'success');
+      } else {
+        await addDoc(getCollectionPath('transactions'), dataToSave);
+        showNotification('Transaction added successfully!', 'success');
+      }
+      // Reset form and close modal
+      setTransactionFormData(initialTransactionFormData);
+      setEditingTransaction(null);
+      setShowAddModal(false);
+    } catch (e) {
+      console.error("Error saving transaction: ", e);
+      showNotification('Failed to save transaction.', 'error');
+    }
+  };
+
+  const handleDeleteTransaction = async (id) => {
+    if (!userId) return showNotification('Authentication failed. Please refresh.', 'error');
+    try {
+      await deleteDoc(getDocPath('transactions', id));
+      showNotification('Transaction deleted.', 'success');
+    } catch (e) {
+      console.error("Error deleting transaction: ", e);
+      showNotification('Failed to delete transaction.', 'error');
+    }
+  };
+
+  const startEditTransaction = (transaction) => {
+    setEditingTransaction(transaction);
+    setTransactionFormData({ 
+      ...transaction, 
+      date: transaction.date.substring(0, 10), // Ensure date format is YYYY-MM-DD
+      amount: transaction.amount.toString(), // Convert to string for form input
+    });
+    setShowAddModal(true);
+  };
+
+  const resetTransactionForm = () => {
+    setTransactionFormData(initialTransactionFormData);
+    setEditingTransaction(null);
     setShowAddModal(false);
   };
-
-  const handleAddCategory = () => {
-    if (!categoryFormData.name || !categoryFormData.budget || !categoryFormData.icon) return;
-
-    if (editingCategory) {
-      setCategories(categories.map(c => 
-        c.id === editingCategory.id ? { ...editingCategory, ...categoryFormData } : c
-      ));
-      setEditingCategory(null);
-    } else {
-      setCategories([...categories, { id: Date.now(), ...categoryFormData, parentId: null }]);
+  
+  // --- Accounts CRUD ---
+  const handleAddOrUpdateAccount = async () => {
+    if (!userId) return showNotification('Authentication failed. Please refresh.', 'error');
+    if (!accountFormData.name || accountFormData.initialBalance === null) {
+      return showNotification('Please fill out all account fields.', 'warning');
     }
 
-    setCategoryFormData({ name: '', icon: '', color: '#95E1D3', type: 'need', budget: 0 });
-    setShowCategoryForm(false);
-  };
+    const dataToSave = {
+      ...accountFormData,
+      initialBalance: parseFloat(accountFormData.initialBalance),
+      createdAt: editingAccount ? editingAccount.createdAt : new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
 
-  const handleAddSubcategory = () => {
-    if (!subcategoryFormData.name || !subcategoryFormData.budget || !subcategoryFormData.icon) return;
-
-    if (editingSubcategory) {
-      setCategories(categories.map(c => 
-        c.id === editingSubcategory.id ? { ...editingSubcategory, ...subcategoryFormData } : c
-      ));
-      setEditingSubcategory(null);
-    } else {
-      const parentCat = categories.find(c => c.id === selectedCategoryId);
-      setCategories([...categories, { 
-        id: Date.now(), 
-        name: subcategoryFormData.name,
-        icon: subcategoryFormData.icon,
-        budget: subcategoryFormData.budget,
-        color: parentCat.color,
-        type: parentCat.type,
-        parentId: selectedCategoryId 
-      }]);
-    }
-
-    setSubcategoryFormData({ name: '', icon: '', budget: 0 });
-    setShowSubcategoryForm(false);
-  };
-
-  const handleAddAccount = () => {
-    if (!accountFormData.name || !accountFormData.balance) return;
-
-    if (editingAccount) {
-      setAccounts(accounts.map(a => 
-        a.id === editingAccount.id 
-          ? { ...editingAccount, ...accountFormData, balance: parseFloat(accountFormData.balance) }
-          : a
-      ));
+    try {
+      if (editingAccount) {
+        await updateDoc(getDocPath('accounts', editingAccount.id), dataToSave);
+        showNotification('Account updated!', 'success');
+      } else {
+        await addDoc(getCollectionPath('accounts'), dataToSave);
+        showNotification('Account added!', 'success');
+      }
+      setAccountFormData(initialAccountFormData);
       setEditingAccount(null);
-    } else {
-      setAccounts([...accounts, { id: Date.now(), ...accountFormData, balance: parseFloat(accountFormData.balance) }]);
+      setShowAccountForm(false);
+    } catch (e) {
+      console.error("Error saving account: ", e);
+      showNotification('Failed to save account.', 'error');
     }
-
-    setAccountFormData({ name: '', balance: '', color: '#4ECDC4', type: 'checking' });
-    setShowAccountForm(false);
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 sticky top-0 z-40">
-        <h1 className="text-2xl font-bold">Finance Tracker</h1>
+  const handleDeleteAccount = async (id) => {
+    if (!userId) return showNotification('Authentication failed. Please refresh.', 'error');
+    
+    // Safety check: Cannot delete account if it has transactions
+    const hasTransactions = transactions.some(t => t.accountId === id);
+    if (hasTransactions) {
+      return showNotification('Cannot delete account with existing transactions. Delete transactions first.', 'error');
+    }
+
+    try {
+      await deleteDoc(getDocPath('accounts', id));
+      showNotification('Account deleted.', 'success');
+    } catch (e) {
+      console.error("Error deleting account: ", e);
+      showNotification('Failed to delete account.', 'error');
+    }
+  };
+
+  // --- Categories CRUD ---
+  const handleAddOrUpdateCategory = async () => {
+    if (!userId) return showNotification('Authentication failed. Please refresh.', 'error');
+    if (!categoryFormData.name) {
+      return showNotification('Category name is required.', 'warning');
+    }
+
+    const dataToSave = {
+      ...categoryFormData,
+      createdAt: editingCategory ? editingCategory.createdAt : new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    try {
+      if (editingCategory) {
+        await updateDoc(getDocPath('categories', editingCategory.id), dataToSave);
+        showNotification('Category updated!', 'success');
+      } else {
+        await addDoc(getCollectionPath('categories'), dataToSave);
+        showNotification('Category added!', 'success');
+      }
+      setCategoryFormData(initialCategoryFormData);
+      setEditingCategory(null);
+      setShowCategoryForm(false);
+    } catch (e) {
+      console.error("Error saving category: ", e);
+      showNotification('Failed to save category.', 'error');
+    }
+  };
+
+  const handleDeleteCategory = async (id) => {
+    if (!userId) return showNotification('Authentication failed. Please refresh.', 'error');
+    
+    // Safety check: Cannot delete category if it is used in a transaction
+    const isUsed = transactions.some(t => t.categoryId === id);
+    if (isUsed) {
+      return showNotification('Cannot delete category in use.', 'error');
+    }
+
+    try {
+      await deleteDoc(getDocPath('categories', id));
+      showNotification('Category deleted.', 'success');
+    } catch (e) {
+      console.error("Error deleting category: ", e);
+      showNotification('Failed to delete category.', 'error');
+    }
+  };
+  
+  // --- UI COMPONENTS ---
+
+  const LoadingState = () => (
+    <div className="flex flex-col items-center justify-center h-screen bg-gray-50">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+      <p className="mt-4 text-lg text-gray-600 font-medium">Authenticating and loading data...</p>
+      <p className="mt-2 text-sm text-gray-400">User ID: {userId || 'Signing in...'}</p>
+    </div>
+  );
+
+  const Toast = () => (
+    <div 
+      key={showToast.id} 
+      className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-xl text-white transition-opacity duration-300 ${
+        showToast.message ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
+      } ${showToast.type === 'error' ? 'bg-red-500' : showToast.type === 'warning' ? 'bg-yellow-500' : 'bg-green-500'}`}
+      role="alert"
+    >
+      {showToast.message}
+    </div>
+  );
+  
+  const Sidebar = () => (
+    <nav className="p-4 bg-gray-800 text-white w-full sm:w-64 h-full flex flex-col fixed sm:static z-20 transition-transform duration-300 transform sm:translate-x-0">
+      <h1 className="text-2xl font-bold mb-8 flex items-center">
+        <Banknote className="w-6 h-6 mr-2" />
+        Finance Tracker
+      </h1>
+      <div className="flex-grow">
+        <NavItem icon={Home} label="Dashboard" screen="home" />
+        <NavItem icon={List} label="Transactions" screen="transactions" />
+        <NavItem icon={BarChart3} label="Analysis" screen="analysis" />
+        <NavItem icon={Settings} label="Settings" screen="settings" />
       </div>
+      <div className="text-sm text-gray-400 p-2 border-t border-gray-700 mt-4 break-words">
+          <p className="font-semibold">Project ID (App ID):</p>
+          <p className="text-xs">{appId}</p>
+          <p className="font-semibold mt-1">User ID:</p>
+          <p className="text-xs">{userId || 'Loading...'}</p>
+      </div>
+    </nav>
+  );
 
-      <div className="max-w-6xl mx-auto p-6 pb-24">
-        {selectedCategoryId ? (
-          <div className="space-y-4">
-            <button onClick={() => setSelectedCategoryId(null)} className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4">
-              <ChevronLeft size={20} />
-              Back
-            </button>
-            
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <div className="flex items-center gap-3 mb-6">
-                <span className="text-4xl">{categories.find(c => c.id === selectedCategoryId)?.icon}</span>
-                <div>
-                  <h2 className="text-2xl font-bold">{categories.find(c => c.id === selectedCategoryId)?.name}</h2>
-                  <p className="text-sm text-gray-500 capitalize">{categories.find(c => c.id === selectedCategoryId)?.type}</p>
-                </div>
-              </div>
+  const NavItem = ({ icon: Icon, label, screen }) => (
+    <button
+      onClick={() => setCurrentScreen(screen)}
+      className={`flex items-center w-full p-3 rounded-lg transition duration-150 mb-2 ${
+        currentScreen === screen ? 'bg-indigo-600 font-semibold' : 'hover:bg-gray-700'
+      }`}
+    >
+      <Icon className="w-5 h-5 mr-3" />
+      {label}
+    </button>
+  );
 
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <div className="text-sm text-gray-600">Budget</div>
-                  <div className="text-2xl font-bold text-blue-600">${categories.find(c => c.id === selectedCategoryId)?.budget.toFixed(2)}</div>
-                </div>
-                <div className="bg-red-50 p-4 rounded-lg">
-                  <div className="text-sm text-gray-600">Spent</div>
-                  <div className="text-2xl font-bold text-red-600">${transactions.filter(t => t.category === selectedCategoryId || categories.filter(sc => sc.parentId === selectedCategoryId).find(sc => sc.id === t.category)).reduce((sum, t) => sum + t.amount, 0).toFixed(2)}</div>
-                </div>
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <div className="text-sm text-gray-600">Remaining</div>
-                  <div className="text-2xl font-bold text-green-600">${Math.max(0, categories.find(c => c.id === selectedCategoryId)?.budget - transactions.filter(t => t.category === selectedCategoryId || categories.filter(sc => sc.parentId === selectedCategoryId).find(sc => sc.id === t.category)).reduce((sum, t) => sum + t.amount, 0)).toFixed(2)}</div>
-                </div>
-              </div>
-            </div>
+  const Dashboard = () => {
+    // Top 5 recent transactions
+    const recentTransactions = transactions.slice(0, 5);
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-6 border-b border-gray-100">
-                <h3 className="text-lg font-bold">All Transactions</h3>
+    // Calculate Net Flow for the last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const monthlyFlow = transactions.reduce((acc, t) => {
+      const tDate = new Date(t.date);
+      if (tDate >= thirtyDaysAgo) {
+        if (t.type === 'income') acc.income += t.amount;
+        else if (t.type === 'expense') acc.expense += t.amount;
+      }
+      return acc;
+    }, { income: 0, expense: 0 });
+
+    const StatCard = ({ title, value, icon: Icon, colorClass, isCurrency = true }) => (
+      <div className={`p-5 rounded-xl shadow-lg ${colorClass} text-white`}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium opacity-80">{title}</h3>
+          <Icon className="w-6 h-6 opacity-70" />
+        </div>
+        <p className="mt-1 text-3xl font-bold">
+          {isCurrency ? formatCurrency(value) : value}
+        </p>
+      </div>
+    );
+
+    return (
+      <div className="p-6">
+        <h2 className="text-3xl font-bold text-gray-800 mb-6">Dashboard</h2>
+        
+        {/* Stat Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <StatCard
+            title="Total Balance"
+            value={totalBalance}
+            icon={Wallet}
+            colorClass="bg-indigo-500"
+          />
+          <StatCard
+            title="Monthly Income (Last 30 Days)"
+            value={monthlyFlow.income}
+            icon={TrendingUp}
+            colorClass="bg-green-500"
+          />
+          <StatCard
+            title="Monthly Expenses (Last 30 Days)"
+            value={monthlyFlow.expense}
+            icon={TrendingDown}
+            colorClass="bg-red-500"
+          />
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Recent Transactions */}
+          <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg">
+            <h3 className="text-xl font-semibold mb-4 text-gray-700 flex justify-between items-center">
+              Recent Transactions
+              <button 
+                onClick={() => setCurrentScreen('transactions')} 
+                className="text-indigo-500 hover:text-indigo-700 text-sm font-medium"
+              >
+                View All
+              </button>
+            </h3>
+            {recentTransactions.length > 0 ? (
+              <div className="space-y-3">
+                {recentTransactions.map(t => (
+                  <TransactionRow key={t.id} transaction={t} />
+                ))}
               </div>
-              <div className="divide-y divide-gray-100">
-                {transactions.filter(t => t.category === selectedCategoryId || categories.filter(sc => sc.parentId === selectedCategoryId).find(sc => sc.id === t.category)).map(trans => {
-                  const transcat = categories.find(c => c.id === trans.category);
-                  const acc = accounts.find(a => a.id === trans.accountId);
-                  return (
-                    <div key={trans.id} className="p-4 hover:bg-gray-50 flex justify-between items-center">
-                      <div className="flex items-center gap-3">
-                        <div>
-                          <div className="text-sm font-medium">{transcat?.name} - {trans.note || 'Transaction'}</div>
-                          <div className="text-xs text-gray-500">{trans.date} • {acc?.name}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-sm font-semibold text-red-600">-${trans.amount.toFixed(2)}</div>
-                        <button onClick={() => { setEditingTransaction(trans); setFormData(trans); setShowAddModal(true); }} className="p-2 hover:bg-gray-200 rounded">
-                          <Edit2 size={16} />
-                        </button>
-                        <button onClick={() => setTransactions(transactions.filter(t => t.id !== trans.id))} className="p-2 hover:bg-red-100 rounded">
-                          <Trash2 size={16} className="text-red-600" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            ) : (
+              <p className="text-gray-500 italic">No recent transactions. Start by adding one!</p>
+            )}
           </div>
-        ) : (
-          <>
-            {currentScreen === 'home' && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-md">
-                    <div className="text-sm font-medium text-green-100">Total Income</div>
-                    <div className="text-3xl font-bold">${stats.totalIncome.toFixed(2)}</div>
-                  </div>
-                  <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-md">
-                    <div className="text-sm font-medium text-red-100">Total Expenses</div>
-                    <div className="text-3xl font-bold">${stats.totalExpenses.toFixed(2)}</div>
-                  </div>
-                  <div className={`bg-gradient-to-br ${stats.totalIncome - stats.totalExpenses >= 0 ? 'from-blue-500 to-blue-600' : 'from-orange-500 to-orange-600'} rounded-xl p-6 text-white shadow-md`}>
-                    <div className="text-sm font-medium text-blue-100">Remaining</div>
-                    <div className="text-3xl font-bold">${(stats.totalIncome - stats.totalExpenses).toFixed(2)}</div>
-                  </div>
-                </div>
 
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-                  <h3 className="text-lg font-semibold mb-4 text-gray-800">Budget Overview</h3>
-                  <div className="space-y-4">
-                    {stats.categorySpending.map(cat => (
-                      <div key={cat.id} onClick={() => setSelectedCategoryId(cat.id)} className="cursor-pointer hover:bg-gray-50 p-3 rounded-lg transition-colors">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm font-medium text-gray-700">{cat.icon} {cat.name}</span>
-                          <span className="text-sm font-semibold text-gray-800">${cat.spent.toFixed(2)} / ${cat.budget.toFixed(2)}</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div className="h-full rounded-full" style={{ width: `${Math.min(cat.percentage, 100)}%`, backgroundColor: cat.percentage > 100 ? '#EF4444' : cat.color }} />
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">{cat.percentage.toFixed(0)}% used</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-                  <h3 className="text-lg font-semibold mb-4 text-gray-800">Recent Transactions</h3>
-                  <div className="space-y-3">
-                    {transactions.slice(0, 5).map(trans => {
-                      const cat = categories.find(c => c.id === trans.category);
-                      const parentCat = cat && categories.find(c => c.id === cat.parentId);
-                      return (
-                        <div key={trans.id} className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex items-start gap-3">
-                              <span className="text-lg">{cat ? cat.icon : '💰'}</span>
-                              <div>
-                                <div className="text-sm font-medium">{trans.note || 'Transaction'}</div>
-                                <div className="text-xs text-gray-500">{cat ? cat.name : 'Income'} {parentCat ? `(${parentCat.name})` : ''}</div>
-                                <div className="text-xs text-gray-400">{trans.date}</div>
-                              </div>
-                            </div>
-                            <div className={`text-sm font-semibold ${trans.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                              {trans.type === 'income' ? '+' : '-'}${trans.amount.toFixed(2)}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-            {currentScreen === 'transactions' && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-6 border-b border-gray-100">
-                  <h2 className="text-xl font-bold">All Transactions</h2>
-                </div>
-                <div className="divide-y divide-gray-100">
-                  {transactions.map(trans => {
-                    const cat = categories.find(c => c.id === trans.category);
-                    return (
-                      <div key={trans.id} className="p-4 hover:bg-gray-50 flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                          <span className="text-xl">{cat ? cat.icon : '💰'}</span>
-                          <div>
-                            <div className="text-sm font-medium">{cat ? cat.name : 'Income'}</div>
-                            <div className="text-xs text-gray-500">{trans.date}</div>
-                            {trans.note && <div className="text-xs text-gray-400">{trans.note}</div>}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className={`text-sm font-semibold ${trans.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                            {trans.type === 'income' ? '+' : '-'}${trans.amount.toFixed(2)}
-                          </div>
-                          <button onClick={() => { setEditingTransaction(trans); setFormData(trans); setShowAddModal(true); }} className="p-2 hover:bg-gray-200 rounded">
-                            <Edit2 size={16} />
-                          </button>
-                          <button onClick={() => setTransactions(transactions.filter(t => t.id !== trans.id))} className="p-2 hover:bg-red-100 rounded">
-                            <Trash2 size={16} className="text-red-600" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            {currentScreen === 'categories' && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-bold">Categories</h2>
-                  <button onClick={() => { setCategoryFormData({ name: '', icon: '', color: '#95E1D3', type: 'need', budget: 0 }); setEditingCategory(null); setShowCategoryForm(true); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                    + Add Category
-                  </button>
-                </div>
-                <div className="space-y-3">
-                  {categories.filter(c => !c.parentId).map(cat => (
-                    <div key={cat.id}>
-                      <div className="flex justify-between items-center p-4 border border-gray-100 rounded-lg hover:border-gray-200">
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl">{cat.icon}</span>
-                          <div>
-                            <div className="font-medium">{cat.name}</div>
-                            <div className="text-xs text-gray-500">Budget: ${cat.budget} • {cat.type}</div>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button onClick={() => { setSelectedCategoryId(cat.id); setShowSubcategoryForm(true); setEditingSubcategory(null); setSubcategoryFormData({ name: '', icon: '', budget: 0 }); }} className="px-3 py-1 bg-blue-50 text-blue-600 rounded text-xs font-medium hover:bg-blue-100">
-                            + Subcategory
-                          </button>
-                          <button onClick={() => { setEditingCategory(cat); setCategoryFormData(cat); setShowCategoryForm(true); }} className="p-2 hover:bg-gray-100 rounded">
-                            <Edit2 size={16} />
-                          </button>
-                          <button onClick={() => setCategories(categories.filter(c => c.id !== cat.id && c.parentId !== cat.id))} className="p-2 hover:bg-red-100 rounded">
-                            <Trash2 size={16} className="text-red-600" />
-                          </button>
-                        </div>
-                      </div>
-                      {categories.filter(sc => sc.parentId === cat.id).length > 0 && (
-                        <div className="ml-8 mt-2 space-y-2 mb-3">
-                          {categories.filter(sc => sc.parentId === cat.id).map(subcat => (
-                            <div key={subcat.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xl">{subcat.icon}</span>
-                                <div>
-                                  <div className="text-sm font-medium">{subcat.name}</div>
-                                  <div className="text-xs text-gray-500">Budget: ${subcat.budget}</div>
-                                </div>
-                              </div>
-                              <div className="flex gap-2">
-                                <button onClick={() => { setEditingSubcategory(subcat); setSubcategoryFormData(subcat); setSelectedCategoryId(cat.id); setShowSubcategoryForm(true); }} className="p-2 hover:bg-gray-200 rounded">
-                                  <Edit2 size={16} />
-                                </button>
-                                <button onClick={() => setCategories(categories.filter(c => c.id !== subcat.id))} className="p-2 hover:bg-red-100 rounded">
-                                  <Trash2 size={16} className="text-red-600" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+          {/* Account Overview */}
+          <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg">
+            <h3 className="text-xl font-semibold mb-4 text-gray-700 flex justify-between items-center">
+              Account Overview
+            </h3>
+            {accounts.length > 0 ? (
+              <div className="space-y-3">
+                {accounts.map(account => (
+                  <div key={account.id} className="flex justify-between items-center p-3 rounded-lg shadow-sm" style={{ borderLeft: `4px solid ${account.color}` }}>
+                    <div>
+                      <p className="font-medium text-gray-700">{account.name}</p>
+                      <p className="text-xs text-gray-500 capitalize">{account.type}</p>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {currentScreen === 'accounts' && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-bold">Bank Accounts</h2>
-                  <button onClick={() => { setAccountFormData({ name: '', balance: '', color: '#4ECDC4', type: 'checking' }); setEditingAccount(null); setShowAccountForm(true); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                    + Add
-                  </button>
-                </div>
-                <div className="space-y-3">
-                  {accounts.map(acc => (
-                    <div key={acc.id} className="flex justify-between items-center p-4 border border-gray-100 rounded-lg" style={{ backgroundColor: acc.color + '10' }}>
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: acc.color }}>
-                          <Wallet size={20} className="text-white" />
-                        </div>
-                        <div>
-                          <div className="font-medium">{acc.name}</div>
-                          <div className="text-xs text-gray-500 capitalize">{acc.type}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-lg font-bold" style={{ color: acc.color }}>${acc.balance.toFixed(2)}</div>
-                        <div className="flex gap-2">
-                          <button onClick={() => { setEditingAccount(acc); setAccountFormData(acc); setShowAccountForm(true); }} className="p-2 hover:bg-gray-200 rounded">
-                            <Edit2 size={16} />
-                          </button>
-                          <button onClick={() => setAccounts(accounts.filter(a => a.id !== acc.id))} className="p-2 hover:bg-red-100 rounded">
-                            <Trash2 size={16} className="text-red-600" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-6 pt-6 border-t">
-                  <div className="flex justify-between">
-                    <span className="font-medium">Total Balance</span>
-                    <span className="text-2xl font-bold">${stats.totalAccountBalance.toFixed(2)}</span>
+                    <p className={`font-semibold ${accountBalances[account.id] < 0 ? 'text-red-500' : 'text-gray-800'}`}>
+                      {formatCurrency(accountBalances[account.id])}
+                    </p>
                   </div>
-                </div>
+                ))}
               </div>
+            ) : (
+              <p className="text-gray-500 italic">No accounts added yet.</p>
             )}
-            {currentScreen === 'budget' && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h2 className="text-xl font-bold mb-6">Budget Tracker</h2>
-                <div className="space-y-6">
-                  {stats.categorySpending.map(cat => {
-                    const isOverBudget = cat.percentage > 100;
-                    return (
-                      <div key={cat.id} onClick={() => setSelectedCategoryId(cat.id)} className="cursor-pointer hover:bg-gray-50 p-4 rounded-lg transition-colors">
-                        <div className="flex justify-between items-center mb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-2xl">{cat.icon}</span>
-                            <span className="font-medium">{cat.name}</span>
-                            {isOverBudget && <AlertCircle size={16} className="text-red-600" />}
-                          </div>
-                          <div className="text-right">
-                            <div className={`font-semibold ${isOverBudget ? 'text-red-600' : 'text-gray-800'}`}>${cat.spent.toFixed(2)} / ${cat.budget.toFixed(2)}</div>
-                            <div className="text-xs text-gray-500">{cat.percentage.toFixed(0)}% used</div>
-                          </div>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-3">
-                          <div className="h-full rounded-full" style={{ width: `${Math.min(cat.percentage, 100)}%`, backgroundColor: isOverBudget ? '#EF4444' : cat.color }} />
-                        </div>
-                        {isOverBudget && <div className="text-xs text-red-600 mt-1">Over by ${(cat.spent - cat.budget).toFixed(2)}</div>}
-                        {!isOverBudget && <div className="text-xs text-green-600 mt-1">${cat.remaining.toFixed(2)} remaining</div>}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </>
-        )}
+          </div>
+        </div>
       </div>
+    );
+  };
+  
+  const TransactionRow = ({ transaction }) => {
+    const account = accounts.find(a => a.id === transaction.accountId);
+    const category = categories.find(c => c.id === transaction.categoryId);
+    const isExpense = transaction.type === 'expense';
+    const amountColor = isExpense ? 'text-red-600' : 'text-green-600';
+    const sign = isExpense ? '-' : '+';
+    
+    return (
+      <div className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-lg transition border-b border-gray-100 last:border-b-0">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 text-xl">
+            {category?.icon || (isExpense ? '🛒' : '⭐')}
+          </div>
+          <div>
+            <p className="font-medium text-gray-800">{transaction.description}</p>
+            <p className="text-xs text-gray-500">{category?.name || 'Uncategorized'} &middot; {account?.name || 'No Account'}</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className={`font-semibold ${amountColor}`}>
+            {sign}{formatCurrency(transaction.amount)}
+          </p>
+          <p className="text-xs text-gray-400">
+            {transaction.date}
+          </p>
+          <div className='flex gap-2 mt-1'>
+            <button onClick={() => startEditTransaction(transaction)} className='text-indigo-500 hover:text-indigo-700 p-1 rounded-full'>
+              <Edit2 className='w-4 h-4' />
+            </button>
+            <button onClick={() => handleDeleteTransaction(transaction.id)} className='text-red-500 hover:text-red-700 p-1 rounded-full'>
+              <Trash2 className='w-4 h-4' />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
-      <button onClick={() => setShowAddModal(true)} className="fixed bottom-24 right-6 w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-transform">
-        <Plus size={28} />
+  const TransactionsView = () => (
+    <div className="p-6">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">All Transactions</h2>
+      <button 
+        onClick={() => {
+          resetTransactionForm();
+          setShowAddModal(true);
+        }} 
+        className="mb-6 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition flex items-center shadow-md"
+      >
+        <Plus className="w-5 h-5 mr-2" />
+        Add New Transaction
       </button>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
-        <div className="max-w-6xl mx-auto grid grid-cols-5 px-4 py-3">
-          <button onClick={() => setCurrentScreen('home')} className={`flex flex-col items-center gap-1 ${currentScreen === 'home' ? 'text-blue-600' : 'text-gray-400'}`}>
-            <Home size={20} />
-            <span className="text-xs">Home</span>
-          </button>
-          <button onClick={() => setCurrentScreen('transactions')} className={`flex flex-col items-center gap-1 ${currentScreen === 'transactions' ? 'text-blue-600' : 'text-gray-400'}`}>
-            <List size={20} />
-            <span className="text-xs">Transactions</span>
-          </button>
-          <button onClick={() => setCurrentScreen('categories')} className={`flex flex-col items-center gap-1 ${currentScreen === 'categories' ? 'text-blue-600' : 'text-gray-400'}`}>
-            <Settings size={20} />
-            <span className="text-xs">Categories</span>
-          </button>
-          <button onClick={() => setCurrentScreen('accounts')} className={`flex flex-col items-center gap-1 ${currentScreen === 'accounts' ? 'text-blue-600' : 'text-gray-400'}`}>
-            <Wallet size={20} />
-            <span className="text-xs">Accounts</span>
-          </button>
-          <button onClick={() => setCurrentScreen('budget')} className={`flex flex-col items-center gap-1 ${currentScreen === 'budget' ? 'text-blue-600' : 'text-gray-400'}`}>
-            <BarChart3 size={20} />
-            <span className="text-xs">Budget</span>
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+        {transactions.length > 0 ? (
+          <div className="divide-y divide-gray-100">
+            {transactions.map(t => (
+              <TransactionRow key={t.id} transaction={t} />
+            ))}
+          </div>
+        ) : (
+          <p className="p-6 text-gray-500 italic">No transactions recorded yet.</p>
+        )}
+      </div>
+    </div>
+  );
+
+  const AddTransactionModal = () => {
+    // Determine which category options to show based on transaction type
+    const categoryOptions = categories.filter(c => c.type === transactionFormData.type);
+
+    return (
+      <Modal title={editingTransaction ? 'Edit Transaction' : 'New Transaction'} onClose={resetTransactionForm}>
+        <div className="space-y-4">
+          <div className='flex gap-4'>
+            <button 
+              onClick={() => setTransactionFormData(prev => ({ ...prev, type: 'expense' }))}
+              className={`flex-1 py-2 rounded-lg font-medium transition ${transactionFormData.type === 'expense' ? 'bg-red-500 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+            >
+              Expense
+            </button>
+            <button 
+              onClick={() => setTransactionFormData(prev => ({ ...prev, type: 'income' }))}
+              className={`flex-1 py-2 rounded-lg font-medium transition ${transactionFormData.type === 'income' ? 'bg-green-500 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+            >
+              Income
+            </button>
+          </div>
+          
+          <Input 
+            label="Description" 
+            type="text" 
+            value={transactionFormData.description} 
+            onChange={(e) => setTransactionFormData({ ...transactionFormData, description: e.target.value })} 
+          />
+          <Input 
+            label="Amount" 
+            type="number" 
+            min="0.01"
+            step="0.01"
+            value={transactionFormData.amount} 
+            onChange={(e) => setTransactionFormData({ ...transactionFormData, amount: e.target.value })} 
+          />
+          <Input 
+            label="Date" 
+            type="date" 
+            value={transactionFormData.date} 
+            onChange={(e) => setTransactionFormData({ ...transactionFormData, date: e.target.value })} 
+          />
+          
+          <Select 
+            label="Account" 
+            value={transactionFormData.accountId} 
+            onChange={(e) => setTransactionFormData({ ...transactionFormData, accountId: e.target.value })}
+            options={accounts.map(a => ({ value: a.id, label: a.name }))}
+            placeholder="Select an account"
+          />
+
+          <Select 
+            label="Category" 
+            value={transactionFormData.categoryId} 
+            onChange={(e) => setTransactionFormData({ ...transactionFormData, categoryId: e.target.value })}
+            options={categoryOptions.map(c => ({ value: c.id, label: `${c.icon} ${c.name}` }))}
+            placeholder="Select a category"
+          />
+
+          <button onClick={handleAddOrUpdateTransaction} className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 transition mt-4 shadow-lg">
+            {editingTransaction ? 'Update Transaction' : 'Add Transaction'}
           </button>
         </div>
+      </Modal>
+    );
+  };
+  
+  const SettingsView = () => (
+    <div className="p-6">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Settings & Management</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <AccountManagement />
+        <CategoryManagement />
       </div>
 
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full max-h-96 overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">{editingTransaction ? 'Edit' : 'Add'} Transaction</h2>
-              <button onClick={() => setShowAddModal(false)} className="p-1 hover:bg-gray-100 rounded">
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex gap-2">
-                <button onClick={() => setFormData({ ...formData, type: 'expense' })} className={`flex-1 py-2 rounded-lg font-medium text-sm ${formData.type === 'expense' ? 'bg-red-600 text-white' : 'bg-gray-100'}`}>Expense</button>
-                <button onClick={() => setFormData({ ...formData, type: 'income' })} className={`flex-1 py-2 rounded-lg font-medium text-sm ${formData.type === 'income' ? 'bg-green-600 text-white' : 'bg-gray-100'}`}>Income</button>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Amount</label>
-                <input type="number" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} className="w-full px-3 py-2 border rounded-lg mt-1 text-sm" placeholder="0.00" />
-              </div>
-              {formData.type === 'expense' && (
-                <>
-                  <div>
-                    <label className="text-sm font-medium">Category</label>
-                    <select value={(() => {
-                      const selectedCat = categories.find(c => c.id === formData.category);
-                      return selectedCat?.parentId || formData.category || '';
-                    })()} onChange={(e) => setFormData({ ...formData, category: parseInt(e.target.value) })} className="w-full px-3 py-2 border rounded-lg mt-1 text-sm">
-                      <option value="">Select a category</option>
-                      {categories.filter(c => !c.parentId).map(cat => <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>)}
-                    </select>
-                  </div>
-                  {formData.category && (() => {
-                    const selectedCat = categories.find(c => c.id === formData.category);
-                    const mainCatId = selectedCat?.parentId || formData.category;
-                    const subcats = categories.filter(sc => sc.parentId === mainCatId);
-                    return subcats.length > 0 ? (
-                      <div>
-                        <label className="text-sm font-medium">Subcategory (Optional)</label>
-                        <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: parseInt(e.target.value) })} className="w-full px-3 py-2 border rounded-lg mt-1 text-sm">
-                          <option value={mainCatId}>{categories.find(c => c.id === mainCatId)?.name}</option>
-                          {subcats.map(subcat => <option key={subcat.id} value={subcat.id}>{subcat.icon} {subcat.name}</option>)}
-                        </select>
-                      </div>
-                    ) : null;
-                  })()}
-                </>
-              )}
-              <div>
-                <label className="text-sm font-medium">Account</label>
-                <select value={formData.accountId} onChange={(e) => setFormData({ ...formData, accountId: parseInt(e.target.value) })} className="w-full px-3 py-2 border rounded-lg mt-1 text-sm">
-                  {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Date</label>
-                <input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} className="w-full px-3 py-2 border rounded-lg mt-1 text-sm" />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Note</label>
-                <input type="text" value={formData.note} onChange={(e) => setFormData({ ...formData, note: e.target.value })} className="w-full px-3 py-2 border rounded-lg mt-1 text-sm" placeholder="Optional note" />
-              </div>
-              <button onClick={handleAddTransaction} className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium">
-                {editingTransaction ? 'Update' : 'Add'} Transaction
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showCategoryForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full max-h-96 overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">{editingCategory ? 'Edit' : 'Add'} Category</h2>
-              <button onClick={() => { setShowCategoryForm(false); setEditingCategory(null); }} className="p-1 hover:bg-gray-100 rounded">
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium">Category Name</label>
-                <input type="text" value={categoryFormData.name} onChange={(e) => setCategoryFormData({ ...categoryFormData, name: e.target.value })} className="w-full px-3 py-2 border rounded-lg mt-1 text-sm" placeholder="e.g., Transport" />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium">Select Emoji</label>
-                <div className="grid grid-cols-6 gap-2 mt-2 p-3 border rounded-lg bg-gray-50 max-h-40 overflow-y-auto">
-                  {emojis.map(emoji => (
-                    <button key={emoji} onClick={() => setCategoryFormData({ ...categoryFormData, icon: emoji })} className={`text-2xl p-2 rounded-lg transition-all ${categoryFormData.icon === emoji ? 'bg-blue-500 scale-125' : 'hover:bg-gray-200'}`}>
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium">Budget Amount</label>
-                <input type="number" value={categoryFormData.budget} onChange={(e) => setCategoryFormData({ ...categoryFormData, budget: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 border rounded-lg mt-1 text-sm" placeholder="0.00" />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium">Category Type</label>
-                <select value={categoryFormData.type} onChange={(e) => setCategoryFormData({ ...categoryFormData, type: e.target.value })} className="w-full px-3 py-2 border rounded-lg mt-1 text-sm">
-                  <option value="need">Need</option>
-                  <option value="want">Want</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium">Color</label>
-                <div className="flex gap-2 mt-2">
-                  {['#FF6B6B', '#4ECDC4', '#FFE66D', '#95E1D3', '#F38181', '#AA96DA'].map(color => (
-                    <button key={color} onClick={() => setCategoryFormData({ ...categoryFormData, color })} className={`w-8 h-8 rounded-lg border-2 ${categoryFormData.color === color ? 'border-gray-800' : 'border-gray-300'}`} style={{ backgroundColor: color }} />
-                  ))}
-                </div>
-              </div>
-
-              <button onClick={handleAddCategory} className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium">
-                {editingCategory ? 'Update' : 'Add'} Category
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showSubcategoryForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">{editingSubcategory ? 'Edit' : 'Add'} Subcategory</h2>
-              <button onClick={() => { setShowSubcategoryForm(false); setEditingSubcategory(null); }} className="p-1 hover:bg-gray-100 rounded">
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium">Subcategory Name</label>
-                <input type="text" value={subcategoryFormData.name} onChange={(e) => setSubcategoryFormData({ ...subcategoryFormData, name: e.target.value })} className="w-full px-3 py-2 border rounded-lg mt-1 text-sm" placeholder="e.g., Bus" />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium">Select Emoji</label>
-                <div className="grid grid-cols-6 gap-2 mt-2 p-3 border rounded-lg bg-gray-50 max-h-40 overflow-y-auto">
-                  {emojis.map(emoji => (
-                    <button key={emoji} onClick={() => setSubcategoryFormData({ ...subcategoryFormData, icon: emoji })} className={`text-2xl p-2 rounded-lg transition-all ${subcategoryFormData.icon === emoji ? 'bg-blue-500 scale-125' : 'hover:bg-gray-200'}`}>
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium">Budget Amount</label>
-                <input type="number" value={subcategoryFormData.budget} onChange={(e) => setSubcategoryFormData({ ...subcategoryFormData, budget: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 border rounded-lg mt-1 text-sm" placeholder="0.00" />
-              </div>
-
-              <button onClick={handleAddSubcategory} className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium">
-                {editingSubcategory ? 'Update' : 'Add'} Subcategory
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {showAccountForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">{editingAccount ? 'Edit' : 'Add'} Account</h2>
-              <button onClick={() => { setShowAccountForm(false); setEditingAccount(null); }} className="p-1 hover:bg-gray-100 rounded">
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium">Account Name</label>
-                <input type="text" value={accountFormData.name} onChange={(e) => setAccountFormData({ ...accountFormData, name: e.target.value })} className="w-full px-3 py-2 border rounded-lg mt-1 text-sm" placeholder="e.g., My Checking" />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Balance</label>
-                <input type="number" value={accountFormData.balance} onChange={(e) => setAccountFormData({ ...accountFormData, balance: e.target.value })} className="w-full px-3 py-2 border rounded-lg mt-1 text-sm" placeholder="0.00" />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Account Type</label>
-                <select value={accountFormData.type} onChange={(e) => setAccountFormData({ ...accountFormData, type: e.target.value })} className="w-full px-3 py-2 border rounded-lg mt-1 text-sm">
-                  <option value="checking">Checking</option>
-                  <option value="savings">Savings</option>
-                  <option value="cash">Cash</option>
-                  <option value="credit">Credit Card</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Color</label>
-                <div className="flex gap-2 mt-2">
-                  {['#FF6B6B', '#4ECDC4', '#FFE66D', '#95E1D3', '#F38181', '#AA96DA'].map(color => (
-                    <button key={color} onClick={() => setAccountFormData({ ...accountFormData, color })} className={`w-8 h-8 rounded-lg border-2 ${accountFormData.color === color ? 'border-gray-800' : 'border-gray-300'}`} style={{ backgroundColor: color }} />
-                  ))}
-                </div>
-              </div>
-              <button onClick={handleAddAccount} className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium">
-                {editingAccount ? 'Update' : 'Add'} Account
-              </button>
-            </div>
-          </div>
-        </div>
+        <AccountFormModal />
+      )}
+      {showCategoryForm && (
+        <CategoryFormModal />
       )}
     </div>
   );
-}
+  
+  const AccountManagement = () => (
+    <div className="bg-white p-6 rounded-xl shadow-lg">
+      <h3 className="text-xl font-semibold mb-4 text-gray-700 flex justify-between items-center">
+        Accounts
+        <button onClick={() => {
+          setAccountFormData(initialAccountFormData);
+          setEditingAccount(null);
+          setShowAccountForm(true);
+        }} className="text-indigo-600 hover:text-indigo-800 flex items-center text-sm font-medium">
+          <Plus className="w-4 h-4 mr-1" /> New Account
+        </button>
+      </h3>
+      <div className="space-y-3">
+        {accounts.length > 0 ? (
+          accounts.map(account => (
+            <div key={account.id} className="p-3 bg-gray-50 rounded-lg flex justify-between items-center border-l-4" style={{ borderLeftColor: account.color }}>
+              <div>
+                <p className="font-medium text-gray-800">{account.name} ({account.type})</p>
+                <p className="text-sm text-gray-500">Balance: {formatCurrency(accountBalances[account.id])}</p>
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => { setEditingAccount(account); setAccountFormData(account); setShowAccountForm(true); }}
+                  className='text-indigo-500 hover:text-indigo-700 p-1 rounded-full'
+                >
+                  <Edit2 className='w-4 h-4' />
+                </button>
+                <button 
+                  onClick={() => handleDeleteAccount(account.id)} 
+                  className='text-red-500 hover:text-red-700 p-1 rounded-full'
+                >
+                  <Trash2 className='w-4 h-4' />
+                </button>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-gray-500 italic">No accounts defined.</p>
+        )}
+      </div>
+    </div>
+  );
 
-// auth
+  const AccountFormModal = () => (
+    <Modal 
+      title={editingAccount ? 'Edit Account' : 'Add New Account'} 
+      onClose={() => setShowAccountForm(false)}
+    >
+      <div className="space-y-4">
+        <Input 
+          label="Account Name" 
+          type="text" 
+          value={accountFormData.name} 
+          onChange={(e) => setAccountFormData({ ...accountFormData, name: e.target.value })} 
+        />
+        <Input 
+          label="Initial Balance" 
+          type="number" 
+          step="0.01"
+          value={accountFormData.initialBalance} 
+          onChange={(e) => setAccountFormData({ ...accountFormData, initialBalance: e.target.value })} 
+        />
+        <Select 
+          label="Account Type" 
+          value={accountFormData.type} 
+          onChange={(e) => setAccountFormData({ ...accountFormData, type: e.target.value })}
+          options={['checking', 'savings', 'cash', 'credit'].map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
+        />
+        <div>
+          <label className="text-sm font-medium block mb-2">Color</label>
+          <div className="flex gap-2">
+            {['#FF6B6B', '#4ECDC4', '#FFE66D', '#95E1D3', '#F38181', '#AA96DA', '#6A0572'].map(color => (
+              <button 
+                key={color} 
+                onClick={() => setAccountFormData({ ...accountFormData, color })} 
+                className={`w-8 h-8 rounded-lg border-2 transition ${accountFormData.color === color ? 'border-gray-800 scale-110' : 'border-gray-300'}`} 
+                style={{ backgroundColor: color }} 
+              />
+            ))}
+          </div>
+        </div>
+        <button onClick={handleAddOrUpdateAccount} className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition mt-4 shadow-lg">
+          {editingAccount ? 'Update Account' : 'Add Account'}
+        </button>
+      </div>
+    </Modal>
+  );
+
+  const CategoryManagement = () => (
+    <div className="bg-white p-6 rounded-xl shadow-lg">
+      <h3 className="text-xl font-semibold mb-4 text-gray-700 flex justify-between items-center">
+        Categories
+        <button onClick={() => {
+          setCategoryFormData(initialCategoryFormData);
+          setEditingCategory(null);
+          setShowCategoryForm(true);
+        }} className="text-indigo-600 hover:text-indigo-800 flex items-center text-sm font-medium">
+          <Plus className="w-4 h-4 mr-1" /> New Category
+        </button>
+      </h3>
+      <div className="space-y-3">
+        {categories.length > 0 ? (
+          categories.map(cat => (
+            <div key={cat.id} className="p-3 bg-gray-50 rounded-lg flex justify-between items-center">
+              <p className="font-medium text-gray-800">{cat.icon} {cat.name}</p>
+              <div className='flex gap-2'>
+                <span className={`text-xs px-2 py-1 rounded-full font-semibold ${cat.type === 'expense' ? 'bg-red-200 text-red-800' : 'bg-green-200 text-green-800'}`}>
+                  {cat.type}
+                </span>
+                <button 
+                  onClick={() => { setEditingCategory(cat); setCategoryFormData(cat); setShowCategoryForm(true); }}
+                  className='text-indigo-500 hover:text-indigo-700 p-1 rounded-full'
+                >
+                  <Edit2 className='w-4 h-4' />
+                </button>
+                <button 
+                  onClick={() => handleDeleteCategory(cat.id)} 
+                  className='text-red-500 hover:text-red-700 p-1 rounded-full'
+                >
+                  <Trash2 className='w-4 h-4' />
+                </button>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-gray-500 italic">No categories defined.</p>
+        )}
+      </div>
+    </div>
+  );
+
+  const CategoryFormModal = () => (
+    <Modal 
+      title={editingCategory ? 'Edit Category' : 'Add New Category'} 
+      onClose={() => setShowCategoryForm(false)}
+    >
+      <div className="space-y-4">
+        <Input 
+          label="Category Name" 
+          type="text" 
+          value={categoryFormData.name} 
+          onChange={(e) => setCategoryFormData({ ...categoryFormData, name: e.target.value })} 
+        />
+        <Select 
+          label="Type" 
+          value={categoryFormData.type} 
+          onChange={(e) => setCategoryFormData({ ...categoryFormData, type: e.target.value })}
+          options={['expense', 'income'].map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
+        />
+        <Input 
+          label="Icon (Emoji)" 
+          type="text" 
+          maxLength="2"
+          value={categoryFormData.icon} 
+          onChange={(e) => setCategoryFormData({ ...categoryFormData, icon: e.target.value })} 
+        />
+        <button onClick={handleAddOrUpdateCategory} className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition mt-4 shadow-lg">
+          {editingCategory ? 'Update Category' : 'Add Category'}
+        </button>
+      </div>
+    </Modal>
+  );
+
+  const Modal = ({ children, title, onClose }) => (
+    <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto transform transition-all">
+        <div className="flex justify-between items-center p-5 border-b border-gray-100">
+          <h3 className="text-xl font-semibold text-gray-800">{title}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+        <div className="p-6">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+
+  const Input = ({ label, type, value, onChange, ...props }) => (
+    <div>
+      <label className="text-sm font-medium text-gray-700 mb-1 block">{label}</label>
+      <input 
+        type={type} 
+        value={value} 
+        onChange={onChange} 
+        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 text-base"
+        {...props}
+      />
+    </div>
+  );
+
+  const Select = ({ label, value, onChange, options, placeholder }) => (
+    <div>
+      <label className="text-sm font-medium text-gray-700 mb-1 block">{label}</label>
+      <select 
+        value={value} 
+        onChange={onChange} 
+        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 text-base appearance-none"
+      >
+        {placeholder && <option value="" disabled>{placeholder}</option>}
+        {options.map(opt => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+
+  // --- MAIN RENDER LOGIC ---
+
+  if (!isAuthReady) {
+    return <LoadingState />;
+  }
+
+  const renderScreen = () => {
+    switch (currentScreen) {
+      case 'home':
+        return <Dashboard />;
+      case 'transactions':
+        return <TransactionsView />;
+      case 'settings':
+        return <SettingsView />;
+      case 'analysis':
+        return <div className="p-6"><h2 className="text-3xl font-bold">Analysis (Coming Soon)</h2><p className="text-gray-500 mt-2">Charts and insights will go here.</p></div>
+      default:
+        return <Dashboard />;
+    }
+  };
+
+
+  return (
+    <div className="min-h-screen bg-gray-50 font-sans antialiased flex flex-col sm:flex-row">
+      {/* Sidebar for desktop */}
+      <div className="hidden sm:block">
+        <Sidebar />
+      </div>
+      
+      {/* Main Content Area */}
+      <main className="flex-grow sm:ml-64 p-0 w-full">
+        {renderScreen()}
+      </main>
+
+      {/* Mobile Navigation (Bottom Bar) */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-30 shadow-2xl">
+        <div className="flex justify-around items-center h-16">
+          <NavItem icon={Home} label="Dashboard" screen="home" />
+          <NavItem icon={List} label="Txns" screen="transactions" />
+          <button 
+            onClick={() => {
+              resetTransactionForm();
+              setShowAddModal(true);
+            }} 
+            className="w-12 h-12 bg-indigo-600 text-white rounded-full shadow-lg -mt-6 flex items-center justify-center transform transition hover:scale-105"
+          >
+            <Plus className="w-6 h-6" />
+          </button>
+          <NavItem icon={BarChart3} label="Analysis" screen="analysis" />
+          <NavItem icon={Settings} label="Settings" screen="settings" />
+        </div>
+      </div>
+
+      {/* Modal */}
+      {showAddModal && <AddTransactionModal />}
+
+      {/* Toast Notification */}
+      <Toast />
+    </div>
+  );
+}
