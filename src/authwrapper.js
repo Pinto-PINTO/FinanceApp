@@ -4,7 +4,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   setPersistence,
-  browserSessionPersistence,
+  browserLocalPersistence,
   onAuthStateChanged,
   signOut,
 } from "firebase/auth";
@@ -25,11 +25,34 @@ export default function AuthWrapper() {
           "Auth state changed:",
           currentUser ? "User logged in" : "No user"
         );
+
+        if (currentUser) {
+          // Check if session has expired (20 minutes from last activity)
+          const storedLastActivity = localStorage.getItem("lastActivity");
+          if (storedLastActivity) {
+            const timeSinceLastActivity =
+              Date.now() - parseInt(storedLastActivity);
+            const twentyMinutes = 20 * 60 * 1000;
+
+            if (timeSinceLastActivity >= twentyMinutes) {
+              console.log("Session expired due to inactivity");
+              signOut(auth);
+              localStorage.removeItem("lastActivity");
+              setUser(null);
+              setLoading(false);
+              return;
+            }
+          }
+
+          // Update last activity
+          localStorage.setItem("lastActivity", Date.now().toString());
+          setLastActivity(Date.now());
+        } else {
+          localStorage.removeItem("lastActivity");
+        }
+
         setUser(currentUser);
         setLoading(false);
-        if (currentUser) {
-          setLastActivity(Date.now());
-        }
       },
       (error) => {
         console.error("Auth state error:", error);
@@ -47,7 +70,9 @@ export default function AuthWrapper() {
     const events = ["mousedown", "keydown", "scroll", "touchstart", "click"];
 
     const resetTimer = () => {
-      setLastActivity(Date.now());
+      const now = Date.now();
+      setLastActivity(now);
+      localStorage.setItem("lastActivity", now.toString());
     };
 
     // Add event listeners for user activity
@@ -55,15 +80,19 @@ export default function AuthWrapper() {
       document.addEventListener(event, resetTimer);
     });
 
-    // Check inactivity every minute
+    // Check inactivity every 30 seconds
     const interval = setInterval(() => {
-      const inactiveTime = Date.now() - lastActivity;
+      const storedLastActivity = localStorage.getItem("lastActivity");
+      if (!storedLastActivity) return;
+
+      const inactiveTime = Date.now() - parseInt(storedLastActivity);
       const twentyMinutes = 20 * 60 * 1000; // 20 minutes in milliseconds
 
       if (inactiveTime >= twentyMinutes) {
+        console.log("Logging out due to inactivity");
         handleLogout();
       }
-    }, 60000); // Check every minute
+    }, 30000); // Check every 30 seconds
 
     return () => {
       events.forEach((event) => {
@@ -74,14 +103,18 @@ export default function AuthWrapper() {
   }, [user, lastActivity]);
 
   const handleLoginSuccess = () => {
-    setLastActivity(Date.now());
+    const now = Date.now();
+    setLastActivity(now);
+    localStorage.setItem("lastActivity", now.toString());
     // User state will be updated automatically by onAuthStateChanged
   };
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
+      localStorage.removeItem("lastActivity");
       setUser(null);
+      console.log("User logged out successfully");
     } catch (error) {
       console.error("Error logging out:", error);
     }
@@ -108,7 +141,7 @@ export default function AuthWrapper() {
         signInWithEmailAndPassword={signInWithEmailAndPassword}
         createUserWithEmailAndPassword={createUserWithEmailAndPassword}
         setPersistence={setPersistence}
-        browserSessionPersistence={browserSessionPersistence}
+        browserSessionPersistence={browserLocalPersistence}
       />
     );
   }
