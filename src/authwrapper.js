@@ -4,7 +4,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   setPersistence,
-  browserLocalPersistence,
+  browserSessionPersistence,
   onAuthStateChanged,
   signOut,
 } from "firebase/auth";
@@ -20,7 +20,6 @@ export default function AuthWrapper() {
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   const [checkingSetup, setCheckingSetup] = useState(true);
 
-  // Check authentication state on mount
   // Check authentication state on mount
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(
@@ -41,7 +40,7 @@ export default function AuthWrapper() {
 
             if (timeSinceLastActivity >= twentyMinutes) {
               console.log("Session expired due to inactivity");
-              signOut(auth);
+              await signOut(auth);
               localStorage.removeItem("lastActivity");
               setUser(null);
               setLoading(false);
@@ -104,13 +103,13 @@ export default function AuthWrapper() {
       if (!storedLastActivity) return;
 
       const inactiveTime = Date.now() - parseInt(storedLastActivity);
-      const twentyMinutes = 20 * 60 * 1000; // 20 minutes in milliseconds
+      const twentyMinutes = 20 * 60 * 1000;
 
       if (inactiveTime >= twentyMinutes) {
         console.log("Logging out due to inactivity");
         handleLogout();
       }
-    }, 30000); // Check every 30 seconds
+    }, 30000);
 
     return () => {
       events.forEach((event) => {
@@ -118,13 +117,12 @@ export default function AuthWrapper() {
       });
       clearInterval(interval);
     };
-  }, [user, lastActivity]);
+  }, [user]);
 
   const handleLoginSuccess = () => {
     const now = Date.now();
     setLastActivity(now);
     localStorage.setItem("lastActivity", now.toString());
-    // User state will be updated automatically by onAuthStateChanged
   };
 
   const handleLogout = async () => {
@@ -132,6 +130,7 @@ export default function AuthWrapper() {
       await signOut(auth);
       localStorage.removeItem("lastActivity");
       setUser(null);
+      setIsSetupComplete(false);
       console.log("User logged out successfully");
     } catch (error) {
       console.error("Error logging out:", error);
@@ -150,6 +149,21 @@ export default function AuthWrapper() {
     );
   }
 
+  // If no user, show login screen
+  if (!user) {
+    return (
+      <Login
+        onLoginSuccess={handleLoginSuccess}
+        auth={auth}
+        signInWithEmailAndPassword={signInWithEmailAndPassword}
+        createUserWithEmailAndPassword={createUserWithEmailAndPassword}
+        setPersistence={setPersistence}
+        browserSessionPersistence={browserSessionPersistence}
+      />
+    );
+  }
+
+  // If user is logged in but setup is not complete, show onboarding
   if (user && !isSetupComplete) {
     return (
       <OnboardingFlow user={user} onComplete={() => setIsSetupComplete(true)} />
