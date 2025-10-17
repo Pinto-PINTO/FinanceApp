@@ -10,17 +10,22 @@ import {
 } from "firebase/auth";
 import Login from "./login";
 import FinanceTrackerApp from "./App";
+import OnboardingFlow from "./OnboardingFlow";
+import { checkUserSetup } from "./dbService";
 
 export default function AuthWrapper() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lastActivity, setLastActivity] = useState(Date.now());
+  const [isSetupComplete, setIsSetupComplete] = useState(false);
+  const [checkingSetup, setCheckingSetup] = useState(true);
 
+  // Check authentication state on mount
   // Check authentication state on mount
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(
       auth,
-      (currentUser) => {
+      async (currentUser) => {
         console.log(
           "Auth state changed:",
           currentUser ? "User logged in" : "No user"
@@ -40,8 +45,18 @@ export default function AuthWrapper() {
               localStorage.removeItem("lastActivity");
               setUser(null);
               setLoading(false);
+              setCheckingSetup(false);
               return;
             }
+          }
+
+          // Check if user has completed setup
+          try {
+            const setupComplete = await checkUserSetup(currentUser.uid);
+            setIsSetupComplete(setupComplete);
+          } catch (error) {
+            console.error("Error checking setup:", error);
+            setIsSetupComplete(false);
           }
 
           // Update last activity
@@ -49,14 +64,17 @@ export default function AuthWrapper() {
           setLastActivity(Date.now());
         } else {
           localStorage.removeItem("lastActivity");
+          setIsSetupComplete(false);
         }
 
         setUser(currentUser);
         setLoading(false);
+        setCheckingSetup(false);
       },
       (error) => {
         console.error("Auth state error:", error);
         setLoading(false);
+        setCheckingSetup(false);
       }
     );
 
@@ -121,7 +139,7 @@ export default function AuthWrapper() {
   };
 
   // Show loading spinner while checking auth state
-  if (loading) {
+  if (loading || checkingSetup) {
     return (
       <div className="min-h-screen bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center">
         <div className="text-center">
@@ -132,20 +150,12 @@ export default function AuthWrapper() {
     );
   }
 
-  // If no user is logged in, show Login page
-  if (!user) {
+  if (user && !isSetupComplete) {
     return (
-      <Login
-        onLoginSuccess={handleLoginSuccess}
-        auth={auth}
-        signInWithEmailAndPassword={signInWithEmailAndPassword}
-        createUserWithEmailAndPassword={createUserWithEmailAndPassword}
-        setPersistence={setPersistence}
-        browserSessionPersistence={browserLocalPersistence}
-      />
+      <OnboardingFlow user={user} onComplete={() => setIsSetupComplete(true)} />
     );
   }
 
-  // If user is logged in, show Finance Tracker App
+  // If user is logged in and setup is complete, show Finance Tracker App
   return <FinanceTrackerApp user={user} onLogout={handleLogout} />;
 }
