@@ -76,15 +76,20 @@ export default function FinanceTrackerApp({ user, onLogout }) {
   const [showPdfUploadModal, setShowPdfUploadModal] = useState(false);
   const [showImportHelp, setShowImportHelp] = useState(false);
 
+  const [currentMonth, setCurrentMonth] = useState(
+    new Date().toISOString().slice(0, 7) // "YYYY-MM" format
+  );
+
   const [transactionFilters, setTransactionFilters] = useState({
     dateFrom: "",
     dateTo: "",
-    type: "", // "all", "income", "expense", "transfer"
+    type: "",
     category: "",
-    categoryType: "", // "all", "need", "want"
+    categoryType: "",
     minAmount: "",
     maxAmount: "",
     searchNote: "",
+    month: "", 
   });
 
   const [formData, setFormData] = useState({
@@ -119,6 +124,13 @@ export default function FinanceTrackerApp({ user, onLogout }) {
 
   const getFilteredTransactions = () => {
     return transactions.filter((trans) => {
+      // Month filter (priority filter)
+      if (transactionFilters.month) {
+        if (!trans.date.startsWith(transactionFilters.month)) {
+          return false;
+        }
+      }
+
       // Date range filter
       if (transactionFilters.dateFrom && trans.date < transactionFilters.dateFrom) {
         return false;
@@ -126,17 +138,17 @@ export default function FinanceTrackerApp({ user, onLogout }) {
       if (transactionFilters.dateTo && trans.date > transactionFilters.dateTo) {
         return false;
       }
-  
+
       // Transaction type filter
       if (transactionFilters.type && transactionFilters.type !== "all" && trans.type !== transactionFilters.type) {
         return false;
       }
-  
+
       // Category filter
       if (transactionFilters.category && trans.category !== transactionFilters.category) {
         return false;
       }
-  
+
       // Category type filter (need/want)
       if (transactionFilters.categoryType && transactionFilters.categoryType !== "all") {
         const cat = categories.find((c) => c.id === trans.category);
@@ -144,7 +156,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
           return false;
         }
       }
-  
+
       // Amount range filter
       if (transactionFilters.minAmount && trans.amount < parseFloat(transactionFilters.minAmount)) {
         return false;
@@ -152,7 +164,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
       if (transactionFilters.maxAmount && trans.amount > parseFloat(transactionFilters.maxAmount)) {
         return false;
       }
-  
+
       // Search note filter
       if (transactionFilters.searchNote) {
         const searchLower = transactionFilters.searchNote.toLowerCase();
@@ -162,9 +174,41 @@ export default function FinanceTrackerApp({ user, onLogout }) {
           return false;
         }
       }
-  
+
       return true;
     });
+  };
+
+  // Month navigation functions
+  const handlePreviousMonth = () => {
+    const [year, month] = currentMonth.split('-').map(Number);
+    const newDate = new Date(year, month - 2, 1); // month - 2 because months are 0-indexed
+    setCurrentMonth(newDate.toISOString().slice(0, 7));
+  };
+
+  const handleNextMonth = () => {
+    const [year, month] = currentMonth.split('-').map(Number);
+    const newDate = new Date(year, month, 1); // month because we want next month
+    setCurrentMonth(newDate.toISOString().slice(0, 7));
+  };
+
+  const handleCurrentMonth = () => {
+    setCurrentMonth(new Date().toISOString().slice(0, 7));
+  };
+
+  const getMonthDisplay = () => {
+    const [year, month] = currentMonth.split('-').map(Number);
+    const date = new Date(year, month - 1, 1);
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  };
+
+  const isCurrentMonth = () => {
+    return currentMonth === new Date().toISOString().slice(0, 7);
+  };
+
+  // Get transactions for current month
+  const getMonthTransactions = () => {
+    return transactions.filter(t => t.date.startsWith(currentMonth));
   };
 
   // Load data from Firestore on mount
@@ -218,32 +262,37 @@ export default function FinanceTrackerApp({ user, onLogout }) {
   }, [user]);
 
   const stats = useMemo(() => {
-    const totalIncome = transactions
+    // Filter transactions by current month
+    const monthTransactions = transactions.filter(t => 
+      t.date.startsWith(currentMonth)
+    );
+  
+    const totalIncome = monthTransactions
       .filter((t) => t.type === "income")
       .reduce((sum, t) => sum + t.amount, 0);
-    const totalExpenses = transactions
+    const totalExpenses = monthTransactions
       .filter((t) => t.type === "expense")
       .reduce((sum, t) => sum + t.amount, 0);
     const totalAccountBalance = accounts.reduce(
       (sum, acc) => sum + acc.balance,
       0
     );
-
+  
     const categorySpending = categories
       .filter((c) => !c.parentId)
       .map((cat) => {
-        const directSpent = transactions
+        const directSpent = monthTransactions
           .filter((t) => t.type === "expense" && t.category === cat.id)
           .reduce((sum, t) => sum + t.amount, 0);
         const subcats = categories.filter((sc) => sc.parentId === cat.id);
-        const subSpent = transactions
+        const subSpent = monthTransactions
           .filter(
             (t) =>
               t.type === "expense" && subcats.find((sc) => sc.id === t.category)
           )
           .reduce((sum, t) => sum + t.amount, 0);
         const totalSpent = directSpent + subSpent;
-
+  
         return {
           ...cat,
           spent: totalSpent,
@@ -251,14 +300,14 @@ export default function FinanceTrackerApp({ user, onLogout }) {
           percentage: cat.budget > 0 ? (totalSpent / cat.budget) * 100 : 0,
         };
       });
-
+  
     return {
       totalIncome,
       totalExpenses,
       totalAccountBalance,
       categorySpending,
     };
-  }, [transactions, categories, accounts]);
+  }, [transactions, categories, accounts, currentMonth]); // Add currentMonth to dependencies
 
   const handleAddTransaction = async () => {
     if (
@@ -580,7 +629,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                   <div className="text-sm text-gray-600">Spent</div>
                   <div className="text-2xl font-bold text-red-600">
                     $
-                    {transactions
+                    {getMonthTransactions()
                       .filter(
                         (t) =>
                           t.category === selectedCategoryId ||
@@ -600,7 +649,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                       0,
                       categories.find((c) => c.id === selectedCategoryId)
                         ?.budget -
-                        transactions
+                        getMonthTransactions()
                           .filter(
                             (t) =>
                               t.category === selectedCategoryId ||
@@ -622,7 +671,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                 <h3 className="text-lg font-bold">All Transactions</h3>
               </div>
               <div className="divide-y divide-gray-100">
-                {transactions
+                {getMonthTransactions()
                   .filter(
                     (t) =>
                       t.category === selectedCategoryId ||
@@ -689,6 +738,50 @@ export default function FinanceTrackerApp({ user, onLogout }) {
           <>
             {currentScreen === "home" && (
               <div className="space-y-6">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={handlePreviousMonth}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                      title="Previous Month"
+                    >
+                      <ChevronLeft size={24} className="text-gray-600" />
+                    </button>
+                    
+                    <div className="text-center flex-1">
+                      <h2 className="text-3xl font-bold text-gray-900">
+                        {getMonthDisplay()}
+                      </h2>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {getMonthTransactions().length} transactions this month
+                      </p>
+                    </div>
+                    
+                    <button
+                      onClick={handleNextMonth}
+                      disabled={isCurrentMonth()}
+                      className={`p-2 rounded-lg transition-colors ${
+                        isCurrentMonth()
+                          ? "text-gray-300 cursor-not-allowed"
+                          : "hover:bg-gray-100 text-gray-600"
+                      }`}
+                      title="Next Month"
+                    >
+                      <ChevronLeft size={24} className="rotate-180" />
+                    </button>
+                  </div>
+                  
+                  {!isCurrentMonth() && (
+                    <div className="mt-4 text-center">
+                      <button
+                        onClick={handleCurrentMonth}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                      >
+                        Back to Current Month
+                      </button>
+                    </div>
+                  )}
+                </div>
                 {/* Layout Selector Button */}
                 <div className="flex justify-end">
                   <button
@@ -782,7 +875,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                         Recent Transactions
                       </h3>
                       <div className="space-y-3">
-                        {transactions.slice(0, 5).map((trans) => {
+                        {getMonthTransactions().slice(0, 5).map((trans) => {
                           const cat = categories.find(
                             (c) => c.id === trans.category
                           );
@@ -957,7 +1050,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                         Recent Activity
                       </h3>
                       <div className="space-y-2">
-                        {transactions.slice(0, 5).map((trans) => {
+                        {getMonthTransactions().slice(0, 5).map((trans) => {
                           const cat = categories.find(
                             (c) => c.id === trans.category
                           );
@@ -1073,7 +1166,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                           Recent Transactions
                         </h3>
                         <div className="space-y-2">
-                          {transactions.slice(0, 6).map((trans) => {
+                          {getMonthTransactions().slice(0, 6).map((trans) => {
                             const cat = categories.find(
                               (c) => c.id === trans.category
                             );
@@ -1425,6 +1518,44 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                       />
                     </div>
+
+                    {/* Month Filter - ADD THIS */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
+                      <div className="flex gap-2">
+                        <select
+                          value={transactionFilters.month || ""}
+                          onChange={(e) =>
+                            setTransactionFilters({ ...transactionFilters, month: e.target.value })
+                          }
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        >
+                          <option value="">All Time</option>
+                          {/* Generate last 12 months */}
+                          {Array.from({ length: 12 }, (_, i) => {
+                            const date = new Date();
+                            date.setMonth(date.getMonth() - i);
+                            const monthStr = date.toISOString().slice(0, 7);
+                            const display = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                            return (
+                              <option key={monthStr} value={monthStr}>
+                                {display}
+                              </option>
+                            );
+                          })}
+                        </select>
+                        <button
+                          onClick={() => {
+                            setTransactionFilters({ ...transactionFilters, month: currentMonth });
+                          }}
+                          className="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 text-sm font-medium whitespace-nowrap"
+                          title="Current Month"
+                        >
+                          This Month
+                        </button>
+                      </div>
+                    </div>
+
                   </div>
 
                   {/* Clear Filters Button */}
@@ -1440,6 +1571,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                           minAmount: "",
                           maxAmount: "",
                           searchNote: "",
+                          month: "",
                         })
                       }
                       className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium text-sm transition-colors"
