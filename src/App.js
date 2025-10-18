@@ -89,7 +89,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
     minAmount: "",
     maxAmount: "",
     searchNote: "",
-    month: "", 
+    month: new Date().toISOString().slice(0, 7),
   });
 
   const [formData, setFormData] = useState({
@@ -260,6 +260,16 @@ export default function FinanceTrackerApp({ user, onLogout }) {
     };
     loadPreferences();
   }, [user]);
+
+  // Sync transaction filter month with home page current month when switching to transactions screen
+  useEffect(() => {
+    if (currentScreen === "transactions") {
+      setTransactionFilters(prev => ({
+        ...prev,
+        month: currentMonth
+      }));
+    }
+  }, [currentScreen, currentMonth]);
 
   const stats = useMemo(() => {
     // Filter transactions by current month
@@ -1523,14 +1533,14 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
                       <div className="flex gap-2">
-                        <select
-                          value={transactionFilters.month || ""}
-                          onChange={(e) =>
-                            setTransactionFilters({ ...transactionFilters, month: e.target.value })
-                          }
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                        >
-                          <option value="">All Time</option>
+                      <select
+                        value={transactionFilters.month}
+                        onChange={(e) =>
+                          setTransactionFilters({ ...transactionFilters, month: e.target.value })
+                        }
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      >
+                        <option value="">All Time</option>
                           {/* Generate last 12 months */}
                           {Array.from({ length: 12 }, (_, i) => {
                             const date = new Date();
@@ -1544,15 +1554,26 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                             );
                           })}
                         </select>
-                        <button
-                          onClick={() => {
-                            setTransactionFilters({ ...transactionFilters, month: currentMonth });
-                          }}
-                          className="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 text-sm font-medium whitespace-nowrap"
-                          title="Current Month"
-                        >
-                          This Month
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setTransactionFilters({ ...transactionFilters, month: currentMonth });
+                            }}
+                            className="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 text-sm font-medium whitespace-nowrap"
+                            title="Current Month"
+                          >
+                            This Month
+                          </button>
+                          <button
+                            onClick={() => {
+                              setTransactionFilters({ ...transactionFilters, month: "" });
+                            }}
+                            className="px-3 py-2 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 text-sm font-medium whitespace-nowrap"
+                            title="All Time"
+                          >
+                            All Time
+                          </button>
+                        </div>
                       </div>
                     </div>
 
@@ -1571,7 +1592,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                           minAmount: "",
                           maxAmount: "",
                           searchNote: "",
-                          month: "",
+                          month: currentMonth,
                         })
                       }
                       className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium text-sm transition-colors"
