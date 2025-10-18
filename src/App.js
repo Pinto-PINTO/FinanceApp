@@ -12,9 +12,11 @@ import {
   Settings,
   AlertCircle,
   ChevronLeft,
+  Upload,
 } from "lucide-react";
 import * as dbService from "./dbService";
 import { getUserPreferences, updateUserPreferences } from "./dbService";
+import PdfUploadModal from "./PdfUploadModal";
 
 export default function FinanceTrackerApp({ user, onLogout }) {
   const [currentScreen, setCurrentScreen] = useState("home");
@@ -70,6 +72,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
 
   const [homeLayout, setHomeLayout] = useState("layout1"); // Default layout
   const [showLayoutModal, setShowLayoutModal] = useState(false);
+  const [showPdfUploadModal, setShowPdfUploadModal] = useState(false);
 
   const [formData, setFormData] = useState({
     type: "expense",
@@ -242,6 +245,27 @@ export default function FinanceTrackerApp({ user, onLogout }) {
     } catch (error) {
       console.error("Error saving transaction:", error);
       alert("Error saving transaction. Please try again.");
+    }
+  };
+
+  const handleBulkAddTransactions = async (transactionsArray) => {
+    try {
+      const addedTransactions = [];
+      
+      for (const transactionData of transactionsArray) {
+        const newTransaction = await dbService.addTransaction(
+          user.uid,
+          transactionData
+        );
+        addedTransactions.push(newTransaction);
+      }
+      
+      setTransactions([...addedTransactions, ...transactions]);
+      setShowPdfUploadModal(false);
+      alert(`Successfully imported ${addedTransactions.length} transactions!`);
+    } catch (error) {
+      console.error("Error importing transactions:", error);
+      alert("Error importing some transactions. Please try again.");
     }
   };
 
@@ -1179,6 +1203,13 @@ export default function FinanceTrackerApp({ user, onLogout }) {
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="p-6 border-b border-gray-100">
                   <h2 className="text-xl font-bold">All Transactions</h2>
+                  <button
+                    onClick={() => setShowPdfUploadModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <Upload size={18} />
+                    Import from PDF
+                  </button>
                 </div>
                 <div className="divide-y divide-gray-100">
                   {transactions.map((trans) => {
@@ -2296,6 +2327,15 @@ export default function FinanceTrackerApp({ user, onLogout }) {
             </div>
           </div>
         </div>
+      )}
+
+      {showPdfUploadModal && (
+        <PdfUploadModal
+          onClose={() => setShowPdfUploadModal(false)}
+          categories={categories}
+          accounts={accounts}
+          onBulkAdd={handleBulkAddTransactions}
+        />
       )}
     </div>
   );
