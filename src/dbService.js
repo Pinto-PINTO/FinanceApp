@@ -112,3 +112,14 @@ export const deleteAccount = async (userId, accountId) => {
   const accountRef = doc(db, "users", userId, "accounts", accountId);
   await deleteDoc(accountRef);
 };
+
+// ===== USER PREFERENCES =====
+export const getUserPreferences = async (userId) => {
+  const userDoc = await getDoc(doc(db, "users", userId));
+  return userDoc.exists() ? userDoc.data().preferences : null;
+};
+
+export const updateUserPreferences = async (userId, preferences) => {
+  const userRef = doc(db, "users", userId);
+  await updateDoc(userRef, { preferences });
+};

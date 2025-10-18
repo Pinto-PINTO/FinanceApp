@@ -14,6 +14,7 @@ import {
   ChevronLeft,
 } from "lucide-react";
 import * as dbService from "./dbService";
+import { getUserPreferences, updateUserPreferences } from "./dbService";
 
 export default function FinanceTrackerApp({ user, onLogout }) {
   const [currentScreen, setCurrentScreen] = useState("home");
@@ -66,6 +67,9 @@ export default function FinanceTrackerApp({ user, onLogout }) {
   const [transactions, setTransactions] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [dataLoaded, setDataLoaded] = useState(false);
+
+  const [homeLayout, setHomeLayout] = useState("layout1"); // Default layout
+  const [showLayoutModal, setShowLayoutModal] = useState(false);
 
   const [formData, setFormData] = useState({
     type: "expense",
@@ -129,6 +133,22 @@ export default function FinanceTrackerApp({ user, onLogout }) {
     };
 
     loadData();
+  }, [user]);
+
+  // Load user layout preference
+  useEffect(() => {
+    const loadPreferences = async () => {
+      if (!user) return;
+      try {
+        const prefs = await getUserPreferences(user.uid);
+        if (prefs && prefs.homeLayout) {
+          setHomeLayout(prefs.homeLayout);
+        }
+      } catch (error) {
+        console.error("Error loading preferences:", error);
+      }
+    };
+    loadPreferences();
   }, [user]);
 
   const stats = useMemo(() => {
@@ -362,6 +382,16 @@ export default function FinanceTrackerApp({ user, onLogout }) {
     }
   };
 
+  const handleLayoutChange = async (layout) => {
+    setHomeLayout(layout);
+    setShowLayoutModal(false);
+    try {
+      await updateUserPreferences(user.uid, { homeLayout: layout });
+    } catch (error) {
+      console.error("Error saving layout preference:", error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 sticky top-0 z-40">
@@ -572,126 +602,576 @@ export default function FinanceTrackerApp({ user, onLogout }) {
           <>
             {currentScreen === "home" && (
               <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-md">
-                    <div className="text-sm font-medium text-green-100">
-                      Total Income
-                    </div>
-                    <div className="text-3xl font-bold">
-                      ${stats.totalIncome.toFixed(2)}
-                    </div>
-                  </div>
-                  <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-md">
-                    <div className="text-sm font-medium text-red-100">
-                      Total Expenses
-                    </div>
-                    <div className="text-3xl font-bold">
-                      ${stats.totalExpenses.toFixed(2)}
-                    </div>
-                  </div>
-                  <div
-                    className={`bg-gradient-to-br ${
-                      stats.totalIncome - stats.totalExpenses >= 0
-                        ? "from-blue-500 to-blue-600"
-                        : "from-orange-500 to-orange-600"
-                    } rounded-xl p-6 text-white shadow-md`}
+                {/* Layout Selector Button */}
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setShowLayoutModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                   >
-                    <div className="text-sm font-medium text-blue-100">
-                      Remaining
-                    </div>
-                    <div className="text-3xl font-bold">
-                      ${(stats.totalIncome - stats.totalExpenses).toFixed(2)}
-                    </div>
-                  </div>
+                    <Settings size={16} />
+                    <span className="text-sm font-medium">Change Layout</span>
+                  </button>
                 </div>
 
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-                  <h3 className="text-lg font-semibold mb-4 text-gray-800">
-                    Budget Overview
-                  </h3>
-                  <div className="space-y-4">
-                    {stats.categorySpending.map((cat) => (
-                      <div
-                        key={cat.id}
-                        onClick={() => setSelectedCategoryId(cat.id)}
-                        className="cursor-pointer hover:bg-gray-50 p-3 rounded-lg transition-colors"
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm font-medium text-gray-700">
-                            {cat.icon} {cat.name}
-                          </span>
-                          <span className="text-sm font-semibold text-gray-800">
-                            ${cat.spent.toFixed(2)} / ${cat.budget.toFixed(2)}
-                          </span>
+                {/* Layout 1: Classic Card View */}
+                {homeLayout === "layout1" && (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-md">
+                        <div className="text-sm font-medium text-green-100">
+                          Total Income
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="h-full rounded-full"
-                            style={{
-                              width: `${Math.min(cat.percentage, 100)}%`,
-                              backgroundColor:
-                                cat.percentage > 100 ? "#EF4444" : cat.color,
-                            }}
-                          />
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {cat.percentage.toFixed(0)}% used
+                        <div className="text-3xl font-bold">
+                          ${stats.totalIncome.toFixed(2)}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                      <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-md">
+                        <div className="text-sm font-medium text-red-100">
+                          Total Expenses
+                        </div>
+                        <div className="text-3xl font-bold">
+                          ${stats.totalExpenses.toFixed(2)}
+                        </div>
+                      </div>
+                      <div
+                        className={`bg-gradient-to-br ${
+                          stats.totalIncome - stats.totalExpenses >= 0
+                            ? "from-blue-500 to-blue-600"
+                            : "from-orange-500 to-orange-600"
+                        } rounded-xl p-6 text-white shadow-md`}
+                      >
+                        <div className="text-sm font-medium text-blue-100">
+                          Remaining
+                        </div>
+                        <div className="text-3xl font-bold">
+                          $
+                          {(stats.totalIncome - stats.totalExpenses).toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
 
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-                  <h3 className="text-lg font-semibold mb-4 text-gray-800">
-                    Recent Transactions
-                  </h3>
-                  <div className="space-y-3">
-                    {transactions.slice(0, 5).map((trans) => {
-                      const cat = categories.find(
-                        (c) => c.id === trans.category
-                      );
-                      const parentCat =
-                        cat && categories.find((c) => c.id === cat.parentId);
-                      return (
-                        <div
-                          key={trans.id}
-                          className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50"
-                        >
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex items-start gap-3">
-                              <span className="text-lg">
-                                {cat ? cat.icon : "💰"}
+                    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                      <h3 className="text-lg font-semibold mb-4 text-gray-800">
+                        Budget Overview
+                      </h3>
+                      <div className="space-y-4">
+                        {stats.categorySpending.map((cat) => (
+                          <div
+                            key={cat.id}
+                            onClick={() => setSelectedCategoryId(cat.id)}
+                            className="cursor-pointer hover:bg-gray-50 p-3 rounded-lg transition-colors"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-medium text-gray-700">
+                                {cat.icon} {cat.name}
                               </span>
-                              <div>
-                                <div className="text-sm font-medium">
-                                  {trans.note || "Transaction"}
+                              <span className="text-sm font-semibold text-gray-800">
+                                ${cat.spent.toFixed(2)} / $
+                                {cat.budget.toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div
+                                className="h-full rounded-full"
+                                style={{
+                                  width: `${Math.min(cat.percentage, 100)}%`,
+                                  backgroundColor:
+                                    cat.percentage > 100
+                                      ? "#EF4444"
+                                      : cat.color,
+                                }}
+                              />
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {cat.percentage.toFixed(0)}% used
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                      <h3 className="text-lg font-semibold mb-4 text-gray-800">
+                        Recent Transactions
+                      </h3>
+                      <div className="space-y-3">
+                        {transactions.slice(0, 5).map((trans) => {
+                          const cat = categories.find(
+                            (c) => c.id === trans.category
+                          );
+                          const parentCat =
+                            cat &&
+                            categories.find((c) => c.id === cat.parentId);
+                          return (
+                            <div
+                              key={trans.id}
+                              className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50"
+                            >
+                              <div className="flex items-start justify-between mb-2">
+                                <div className="flex items-start gap-3">
+                                  <span className="text-lg">
+                                    {cat ? cat.icon : "💰"}
+                                  </span>
+                                  <div>
+                                    <div className="text-sm font-medium">
+                                      {trans.note || "Transaction"}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {cat ? cat.name : "Income"}{" "}
+                                      {parentCat ? `(${parentCat.name})` : ""}
+                                    </div>
+                                    <div className="text-xs text-gray-400">
+                                      {trans.date}
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="text-xs text-gray-500">
-                                  {cat ? cat.name : "Income"}{" "}
-                                  {parentCat ? `(${parentCat.name})` : ""}
-                                </div>
-                                <div className="text-xs text-gray-400">
-                                  {trans.date}
+                                <div
+                                  className={`text-sm font-semibold ${
+                                    trans.type === "income"
+                                      ? "text-green-600"
+                                      : "text-red-600"
+                                  }`}
+                                >
+                                  {trans.type === "income" ? "+" : "-"}$
+                                  {trans.amount.toFixed(2)}
                                 </div>
                               </div>
                             </div>
-                            <div
-                              className={`text-sm font-semibold ${
-                                trans.type === "income"
-                                  ? "text-green-600"
-                                  : "text-red-600"
-                              }`}
-                            >
-                              {trans.type === "income" ? "+" : "-"}$
-                              {trans.amount.toFixed(2)}
-                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Layout 2: Needs vs Wants Split View */}
+                {homeLayout === "layout2" && (
+                  <>
+                    <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-6 text-white shadow-lg">
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <div className="text-sm text-blue-100">Income</div>
+                          <div className="text-2xl font-bold">
+                            ${stats.totalIncome.toFixed(2)}
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                        <div>
+                          <div className="text-sm text-blue-100">Expenses</div>
+                          <div className="text-2xl font-bold">
+                            ${stats.totalExpenses.toFixed(2)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-blue-100">Balance</div>
+                          <div className="text-2xl font-bold">
+                            $
+                            {(stats.totalIncome - stats.totalExpenses).toFixed(
+                              2
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Needs Section */}
+                      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                          <h3 className="text-lg font-bold text-gray-800">
+                            Needs
+                          </h3>
+                        </div>
+                        <div className="space-y-3">
+                          {stats.categorySpending
+                            .filter((cat) => cat.type === "need")
+                            .map((cat) => (
+                              <div
+                                key={cat.id}
+                                onClick={() => setSelectedCategoryId(cat.id)}
+                                className="cursor-pointer p-3 border border-gray-100 rounded-lg hover:border-red-300 transition-colors"
+                              >
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xl">{cat.icon}</span>
+                                    <span className="text-sm font-medium">
+                                      {cat.name}
+                                    </span>
+                                  </div>
+                                  <span className="text-xs font-semibold text-gray-600">
+                                    ${cat.spent.toFixed(0)} / $
+                                    {cat.budget.toFixed(0)}
+                                  </span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                  <div
+                                    className="h-full rounded-full bg-red-500"
+                                    style={{
+                                      width: `${Math.min(
+                                        cat.percentage,
+                                        100
+                                      )}%`,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+
+                      {/* Wants Section */}
+                      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                          <h3 className="text-lg font-bold text-gray-800">
+                            Wants
+                          </h3>
+                        </div>
+                        <div className="space-y-3">
+                          {stats.categorySpending
+                            .filter((cat) => cat.type === "want")
+                            .map((cat) => (
+                              <div
+                                key={cat.id}
+                                onClick={() => setSelectedCategoryId(cat.id)}
+                                className="cursor-pointer p-3 border border-gray-100 rounded-lg hover:border-blue-300 transition-colors"
+                              >
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xl">{cat.icon}</span>
+                                    <span className="text-sm font-medium">
+                                      {cat.name}
+                                    </span>
+                                  </div>
+                                  <span className="text-xs font-semibold text-gray-600">
+                                    ${cat.spent.toFixed(0)} / $
+                                    {cat.budget.toFixed(0)}
+                                  </span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                  <div
+                                    className="h-full rounded-full bg-blue-500"
+                                    style={{
+                                      width: `${Math.min(
+                                        cat.percentage,
+                                        100
+                                      )}%`,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                      <h3 className="text-lg font-semibold mb-4 text-gray-800">
+                        Recent Activity
+                      </h3>
+                      <div className="space-y-2">
+                        {transactions.slice(0, 5).map((trans) => {
+                          const cat = categories.find(
+                            (c) => c.id === trans.category
+                          );
+                          return (
+                            <div
+                              key={trans.id}
+                              className="flex items-center justify-between p-2 hover:bg-gray-50 rounded"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">
+                                  {cat ? cat.icon : "💰"}
+                                </span>
+                                <div>
+                                  <div className="text-sm font-medium">
+                                    {trans.note || cat?.name || "Transaction"}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {trans.date}
+                                  </div>
+                                </div>
+                              </div>
+                              <div
+                                className={`text-sm font-semibold ${
+                                  trans.type === "income"
+                                    ? "text-green-600"
+                                    : "text-red-600"
+                                }`}
+                              >
+                                {trans.type === "income" ? "+" : "-"}$
+                                {trans.amount.toFixed(2)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Layout 3: Compact Dashboard */}
+                {homeLayout === "layout3" && (
+                  <>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+                        <div className="text-xs text-gray-500 mb-1">Income</div>
+                        <div className="text-xl font-bold text-green-600">
+                          ${stats.totalIncome.toFixed(2)}
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+                        <div className="text-xs text-gray-500 mb-1">
+                          Expenses
+                        </div>
+                        <div className="text-xl font-bold text-red-600">
+                          ${stats.totalExpenses.toFixed(2)}
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+                        <div className="text-xs text-gray-500 mb-1">
+                          Remaining
+                        </div>
+                        <div className="text-xl font-bold text-blue-600">
+                          $
+                          {(stats.totalIncome - stats.totalExpenses).toFixed(2)}
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+                        <div className="text-xs text-gray-500 mb-1">
+                          Accounts
+                        </div>
+                        <div className="text-xl font-bold text-purple-600">
+                          ${stats.totalAccountBalance.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+                        <h3 className="text-md font-bold mb-3 text-gray-800">
+                          Top Categories
+                        </h3>
+                        <div className="space-y-2">
+                          {stats.categorySpending
+                            .sort((a, b) => b.spent - a.spent)
+                            .slice(0, 6)
+                            .map((cat) => (
+                              <div
+                                key={cat.id}
+                                onClick={() => setSelectedCategoryId(cat.id)}
+                                className="flex items-center justify-between p-2 hover:bg-gray-50 rounded cursor-pointer"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg">{cat.icon}</span>
+                                  <span className="text-sm font-medium">
+                                    {cat.name}
+                                  </span>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-sm font-semibold text-gray-800">
+                                    ${cat.spent.toFixed(0)}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {cat.percentage.toFixed(0)}%
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+                        <h3 className="text-md font-bold mb-3 text-gray-800">
+                          Recent Transactions
+                        </h3>
+                        <div className="space-y-2">
+                          {transactions.slice(0, 6).map((trans) => {
+                            const cat = categories.find(
+                              (c) => c.id === trans.category
+                            );
+                            return (
+                              <div
+                                key={trans.id}
+                                className="flex items-center justify-between p-2 hover:bg-gray-50 rounded"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-base">
+                                    {cat ? cat.icon : "💰"}
+                                  </span>
+                                  <div>
+                                    <div className="text-xs font-medium">
+                                      {trans.note || cat?.name || "Transaction"}
+                                    </div>
+                                    <div className="text-xs text-gray-400">
+                                      {trans.date}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div
+                                  className={`text-xs font-semibold ${
+                                    trans.type === "income"
+                                      ? "text-green-600"
+                                      : "text-red-600"
+                                  }`}
+                                >
+                                  {trans.type === "income" ? "+" : "-"}$
+                                  {trans.amount.toFixed(2)}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Layout 4: Detailed Analytics View */}
+                {homeLayout === "layout4" && (
+                  <>
+                    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="text-center">
+                          <div className="text-sm text-gray-500 mb-2">
+                            Total Income
+                          </div>
+                          <div className="text-3xl font-bold text-green-600 mb-1">
+                            ${stats.totalIncome.toFixed(2)}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            This period
+                          </div>
+                        </div>
+                        <div className="text-center border-l border-r border-gray-100">
+                          <div className="text-sm text-gray-500 mb-2">
+                            Total Expenses
+                          </div>
+                          <div className="text-3xl font-bold text-red-600 mb-1">
+                            ${stats.totalExpenses.toFixed(2)}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            {stats.categorySpending.length} categories
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-sm text-gray-500 mb-2">
+                            Net Balance
+                          </div>
+                          <div
+                            className={`text-3xl font-bold mb-1 ${
+                              stats.totalIncome - stats.totalExpenses >= 0
+                                ? "text-blue-600"
+                                : "text-orange-600"
+                            }`}
+                          >
+                            $
+                            {(stats.totalIncome - stats.totalExpenses).toFixed(
+                              2
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            {(
+                              (stats.totalExpenses / (stats.totalIncome || 1)) *
+                              100
+                            ).toFixed(1)}
+                            % spent
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                      <h3 className="text-lg font-bold mb-4 text-gray-800">
+                        Budget Performance
+                      </h3>
+                      <div className="space-y-4">
+                        {stats.categorySpending.map((cat) => {
+                          const isOverBudget = cat.percentage > 100;
+                          const isNearLimit =
+                            cat.percentage > 80 && cat.percentage <= 100;
+                          return (
+                            <div
+                              key={cat.id}
+                              onClick={() => setSelectedCategoryId(cat.id)}
+                              className="cursor-pointer border border-gray-100 rounded-lg p-4 hover:shadow-md transition-shadow"
+                            >
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className="w-12 h-12 rounded-lg flex items-center justify-center text-2xl"
+                                    style={{
+                                      backgroundColor: cat.color + "20",
+                                    }}
+                                  >
+                                    {cat.icon}
+                                  </div>
+                                  <div>
+                                    <div className="font-semibold text-gray-900">
+                                      {cat.name}
+                                    </div>
+                                    <div className="text-xs text-gray-500 capitalize">
+                                      {cat.type} • Budget: $
+                                      {cat.budget.toFixed(2)}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div
+                                    className={`text-lg font-bold ${
+                                      isOverBudget
+                                        ? "text-red-600"
+                                        : isNearLimit
+                                        ? "text-orange-600"
+                                        : "text-gray-900"
+                                    }`}
+                                  >
+                                    ${cat.spent.toFixed(2)}
+                                  </div>
+                                  <div
+                                    className={`text-xs font-medium ${
+                                      isOverBudget
+                                        ? "text-red-600"
+                                        : isNearLimit
+                                        ? "text-orange-600"
+                                        : "text-green-600"
+                                    }`}
+                                  >
+                                    {cat.percentage.toFixed(0)}% used
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                <div
+                                  className="h-full rounded-full transition-all"
+                                  style={{
+                                    width: `${Math.min(cat.percentage, 100)}%`,
+                                    backgroundColor: isOverBudget
+                                      ? "#EF4444"
+                                      : isNearLimit
+                                      ? "#F97316"
+                                      : cat.color,
+                                  }}
+                                />
+                              </div>
+                              {isOverBudget && (
+                                <div className="text-xs text-red-600 mt-2 font-medium">
+                                  ⚠️ Over budget by $
+                                  {(cat.spent - cat.budget).toFixed(2)}
+                                </div>
+                              )}
+                              {isNearLimit && !isOverBudget && (
+                                <div className="text-xs text-orange-600 mt-2 font-medium">
+                                  ⚠️ ${cat.remaining.toFixed(2)} remaining
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -1583,6 +2063,130 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                 className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700"
               >
                 Update Password
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Layout Selection Modal */}
+      {showLayoutModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">Choose Your Layout</h2>
+              <button
+                onClick={() => setShowLayoutModal(false)}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button
+                onClick={() => handleLayoutChange("layout1")}
+                className={`p-4 border-2 rounded-lg text-left transition-all ${
+                  homeLayout === "layout1"
+                    ? "border-blue-600 bg-blue-50"
+                    : "border-gray-200 hover:border-blue-300"
+                }`}
+              >
+                <div className="font-bold text-lg mb-2">Classic View</div>
+                <div className="text-sm text-gray-600 mb-3">
+                  Traditional card layout with overview stats and detailed
+                  budget progress bars
+                </div>
+                <div className="bg-white rounded p-2 border border-gray-100">
+                  <div className="grid grid-cols-3 gap-1 mb-2">
+                    <div className="h-8 bg-green-200 rounded"></div>
+                    <div className="h-8 bg-red-200 rounded"></div>
+                    <div className="h-8 bg-blue-200 rounded"></div>
+                  </div>
+                  <div className="h-16 bg-gray-100 rounded mb-1"></div>
+                  <div className="h-16 bg-gray-100 rounded"></div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleLayoutChange("layout2")}
+                className={`p-4 border-2 rounded-lg text-left transition-all ${
+                  homeLayout === "layout2"
+                    ? "border-blue-600 bg-blue-50"
+                    : "border-gray-200 hover:border-blue-300"
+                }`}
+              >
+                <div className="font-bold text-lg mb-2">Needs vs Wants</div>
+                <div className="text-sm text-gray-600 mb-3">
+                  Split view showing essential expenses separate from
+                  discretionary spending
+                </div>
+                <div className="bg-white rounded p-2 border border-gray-100">
+                  <div className="h-8 bg-gradient-to-r from-blue-300 to-purple-300 rounded mb-2"></div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <div className="h-4 bg-red-200 rounded"></div>
+                      <div className="h-4 bg-red-200 rounded"></div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="h-4 bg-blue-200 rounded"></div>
+                      <div className="h-4 bg-blue-200 rounded"></div>
+                    </div>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleLayoutChange("layout3")}
+                className={`p-4 border-2 rounded-lg text-left transition-all ${
+                  homeLayout === "layout3"
+                    ? "border-blue-600 bg-blue-50"
+                    : "border-gray-200 hover:border-blue-300"
+                }`}
+              >
+                <div className="font-bold text-lg mb-2">Compact Dashboard</div>
+                <div className="text-sm text-gray-600 mb-3">
+                  Condensed view with top categories and recent activity side by
+                  side
+                </div>
+                <div className="bg-white rounded p-2 border border-gray-100">
+                  <div className="grid grid-cols-4 gap-1 mb-2">
+                    <div className="h-6 bg-green-200 rounded"></div>
+                    <div className="h-6 bg-red-200 rounded"></div>
+                    <div className="h-6 bg-blue-200 rounded"></div>
+                    <div className="h-6 bg-purple-200 rounded"></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="h-12 bg-gray-100 rounded"></div>
+                    <div className="h-12 bg-gray-100 rounded"></div>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleLayoutChange("layout4")}
+                className={`p-4 border-2 rounded-lg text-left transition-all ${
+                  homeLayout === "layout4"
+                    ? "border-blue-600 bg-blue-50"
+                    : "border-gray-200 hover:border-blue-300"
+                }`}
+              >
+                <div className="font-bold text-lg mb-2">Detailed Analytics</div>
+                <div className="text-sm text-gray-600 mb-3">
+                  In-depth performance view with warnings for over-budget
+                  categories
+                </div>
+                <div className="bg-white rounded p-2 border border-gray-100">
+                  <div className="grid grid-cols-3 gap-1 mb-2">
+                    <div className="h-8 bg-green-200 rounded"></div>
+                    <div className="h-8 bg-red-200 rounded"></div>
+                    <div className="h-8 bg-blue-200 rounded"></div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="h-8 bg-gray-100 rounded"></div>
+                    <div className="h-8 bg-gray-100 rounded"></div>
+                  </div>
+                </div>
               </button>
             </div>
           </div>
