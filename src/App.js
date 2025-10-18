@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import * as dbService from "./dbService";
 import { getUserPreferences, updateUserPreferences } from "./dbService";
-import PdfUploadModal from "./PdfUploadModal";
+import XlsxUploadModal from "./XlsxUploadModal";
 
 export default function FinanceTrackerApp({ user, onLogout }) {
   const [currentScreen, setCurrentScreen] = useState("home");
@@ -2330,7 +2330,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
       )}
 
       {showPdfUploadModal && (
-        <PdfUploadModal
+        <XlsxUploadModal
           onClose={() => setShowPdfUploadModal(false)}
           categories={categories} 
           accounts={accounts}     
