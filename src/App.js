@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Lock,
   Wallet,
@@ -13,10 +13,8 @@ import {
   AlertCircle,
   ChevronLeft,
 } from "lucide-react";
-import { useEffect } from "react";
 import * as dbService from "./dbService";
 
-// piumi123fernando
 export default function FinanceTrackerApp({ user, onLogout }) {
   const [currentScreen, setCurrentScreen] = useState("home");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -37,7 +35,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
     "🛍️",
     "📄",
     "🎬",
-    "🏥",
+    "🥗",
     "🛒",
     "💼",
     "✈️",
@@ -69,38 +67,13 @@ export default function FinanceTrackerApp({ user, onLogout }) {
   const [accounts, setAccounts] = useState([]);
   const [dataLoaded, setDataLoaded] = useState(false);
 
-  // Load data from Firestore on mount
-  useEffect(() => {
-    const loadData = async () => {
-      if (!user) return;
-
-      try {
-        const [categoriesData, transactionsData, accountsData] =
-          await Promise.all([
-            dbService.getCategories(user.uid),
-            dbService.getTransactions(user.uid),
-            dbService.getAccounts(user.uid),
-          ]);
-
-        setCategories(categoriesData);
-        setTransactions(transactionsData);
-        setAccounts(accountsData);
-        setDataLoaded(true);
-      } catch (error) {
-        console.error("Error loading data:", error);
-      }
-    };
-
-    loadData();
-  }, [user]);
-
   const [formData, setFormData] = useState({
     type: "expense",
     amount: "",
     category: "",
     date: new Date().toISOString().split("T")[0],
     note: "",
-    accountId: 1,
+    accountId: "",
   });
 
   const [categoryFormData, setCategoryFormData] = useState({
@@ -123,6 +96,40 @@ export default function FinanceTrackerApp({ user, onLogout }) {
     color: "#4ECDC4",
     type: "checking",
   });
+
+  // Load data from Firestore on mount
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user) return;
+
+      try {
+        const [categoriesData, transactionsData, accountsData] =
+          await Promise.all([
+            dbService.getCategories(user.uid),
+            dbService.getTransactions(user.uid),
+            dbService.getAccounts(user.uid),
+          ]);
+
+        setCategories(categoriesData);
+        setTransactions(transactionsData);
+        setAccounts(accountsData);
+
+        // Set default account if available
+        if (accountsData.length > 0) {
+          setFormData((prev) => ({
+            ...prev,
+            accountId: accountsData[0].id,
+          }));
+        }
+
+        setDataLoaded(true);
+      } catch (error) {
+        console.error("Error loading data:", error);
+      }
+    };
+
+    loadData();
+  }, [user]);
 
   const stats = useMemo(() => {
     const totalIncome = transactions
@@ -209,7 +216,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
         category: "",
         date: new Date().toISOString().split("T")[0],
         note: "",
-        accountId: accounts[0]?.id || 1,
+        accountId: accounts[0]?.id || "",
       });
       setShowAddModal(false);
     } catch (error) {
@@ -361,7 +368,6 @@ export default function FinanceTrackerApp({ user, onLogout }) {
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <h1 className="text-2xl font-bold">Finance Tracker</h1>
 
-          {/* User Profile Section */}
           <div className="relative">
             <button
               onClick={() => setShowProfileMenu(!showProfileMenu)}
@@ -377,7 +383,6 @@ export default function FinanceTrackerApp({ user, onLogout }) {
               </span>
             </button>
 
-            {/* Dropdown Menu */}
             {showProfileMenu && (
               <>
                 <div
@@ -689,6 +694,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                 </div>
               </div>
             )}
+
             {currentScreen === "transactions" && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="p-6 border-b border-gray-100">
@@ -742,11 +748,15 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                             <Edit2 size={16} />
                           </button>
                           <button
-                            onClick={() =>
+                            onClick={async () => {
+                              await dbService.deleteTransaction(
+                                user.uid,
+                                trans.id
+                              );
                               setTransactions(
                                 transactions.filter((t) => t.id !== trans.id)
-                              )
-                            }
+                              );
+                            }}
                             className="p-2 hover:bg-red-100 rounded"
                           >
                             <Trash2 size={16} className="text-red-600" />
@@ -758,6 +768,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                 </div>
               </div>
             )}
+
             {currentScreen === "categories" && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                 <div className="flex justify-between items-center mb-6">
@@ -826,7 +837,6 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                                   user.uid,
                                   cat.id
                                 );
-                                // Also delete all subcategories
                                 const subcatIds = categories
                                   .filter((c) => c.parentId === cat.id)
                                   .map((c) => c.id);
@@ -910,6 +920,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                 </div>
               </div>
             )}
+
             {currentScreen === "accounts" && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                 <div className="flex justify-between items-center mb-6">
@@ -995,6 +1006,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                 </div>
               </div>
             )}
+
             {currentScreen === "budget" && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                 <h2 className="text-xl font-bold mb-6">Budget Tracker</h2>
@@ -1126,7 +1138,10 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                 {editingTransaction ? "Edit" : "Add"} Transaction
               </h2>
               <button
-                onClick={() => setShowAddModal(false)}
+                onClick={() => {
+                  setShowAddModal(false);
+                  setEditingTransaction(null);
+                }}
                 className="p-1 hover:bg-gray-100 rounded"
               >
                 <X size={20} />
@@ -1166,6 +1181,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                   }
                   className="w-full px-3 py-2 border rounded-lg mt-1 text-sm"
                   placeholder="0.00"
+                  step="0.01"
                 />
               </div>
               {formData.type === "expense" && (
@@ -1177,14 +1193,17 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                         const selectedCat = categories.find(
                           (c) => c.id === formData.category
                         );
-                        return selectedCat?.parentId || formData.category || "";
+                        if (selectedCat && selectedCat.parentId) {
+                          return selectedCat.parentId;
+                        }
+                        return formData.category || "";
                       })()}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setFormData({
                           ...formData,
-                          category: parseInt(e.target.value),
-                        })
-                      }
+                          category: e.target.value,
+                        });
+                      }}
                       className="w-full px-3 py-2 border rounded-lg mt-1 text-sm"
                     >
                       <option value="">Select a category</option>
@@ -1207,6 +1226,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                       const subcats = categories.filter(
                         (sc) => sc.parentId === mainCatId
                       );
+
                       return subcats.length > 0 ? (
                         <div>
                           <label className="text-sm font-medium">
@@ -1214,16 +1234,17 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                           </label>
                           <select
                             value={formData.category}
-                            onChange={(e) =>
+                            onChange={(e) => {
                               setFormData({
                                 ...formData,
-                                category: parseInt(e.target.value),
-                              })
-                            }
+                                category: e.target.value,
+                              });
+                            }}
                             className="w-full px-3 py-2 border rounded-lg mt-1 text-sm"
                           >
                             <option value={mainCatId}>
-                              {categories.find((c) => c.id === mainCatId)?.name}
+                              {categories.find((c) => c.id === mainCatId)?.name}{" "}
+                              (Main)
                             </option>
                             {subcats.map((subcat) => (
                               <option key={subcat.id} value={subcat.id}>
@@ -1243,7 +1264,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      accountId: parseInt(e.target.value),
+                      accountId: e.target.value,
                     })
                   }
                   className="w-full px-3 py-2 border rounded-lg mt-1 text-sm"
@@ -1280,7 +1301,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
               </div>
               <button
                 onClick={handleAddTransaction}
-                className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium"
+                className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700"
               >
                 {editingTransaction ? "Update" : "Add"} Transaction
               </button>
@@ -1361,6 +1382,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                   }
                   className="w-full px-3 py-2 border rounded-lg mt-1 text-sm"
                   placeholder="0.00"
+                  step="0.01"
                 />
               </div>
 
@@ -1410,7 +1432,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
 
               <button
                 onClick={handleAddCategory}
-                className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium"
+                className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700"
               >
                 {editingCategory ? "Update" : "Add"} Category
               </button>
@@ -1491,12 +1513,13 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                   }
                   className="w-full px-3 py-2 border rounded-lg mt-1 text-sm"
                   placeholder="0.00"
+                  step="0.01"
                 />
               </div>
 
               <button
                 onClick={handleAddSubcategory}
-                className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium"
+                className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700"
               >
                 {editingSubcategory ? "Update" : "Add"} Subcategory
               </button>
@@ -1613,6 +1636,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                   }
                   className="w-full px-3 py-2 border rounded-lg mt-1 text-sm"
                   placeholder="0.00"
+                  step="0.01"
                 />
               </div>
               <div>
@@ -1661,7 +1685,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
               </div>
               <button
                 onClick={handleAddAccount}
-                className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium"
+                className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700"
               >
                 {editingAccount ? "Update" : "Add"} Account
               </button>
