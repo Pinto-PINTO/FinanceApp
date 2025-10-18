@@ -2332,8 +2332,8 @@ export default function FinanceTrackerApp({ user, onLogout }) {
       {showPdfUploadModal && (
         <PdfUploadModal
           onClose={() => setShowPdfUploadModal(false)}
-          categories={categories}
-          accounts={accounts}
+          categories={categories} 
+          accounts={accounts}     
           onBulkAdd={handleBulkAddTransactions}
         />
       )}
