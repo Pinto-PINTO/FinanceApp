@@ -13,6 +13,7 @@ import {
   AlertCircle,
   ChevronLeft,
   Upload,
+  HelpCircle,
 } from "lucide-react";
 import * as dbService from "./dbService";
 import { getUserPreferences, updateUserPreferences } from "./dbService";
@@ -73,6 +74,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
   const [homeLayout, setHomeLayout] = useState("layout1"); // Default layout
   const [showLayoutModal, setShowLayoutModal] = useState(false);
   const [showPdfUploadModal, setShowPdfUploadModal] = useState(false);
+  const [showImportHelp, setShowImportHelp] = useState(false);
 
   const [formData, setFormData] = useState({
     type: "expense",
@@ -1202,15 +1204,37 @@ export default function FinanceTrackerApp({ user, onLogout }) {
             {currentScreen === "transactions" && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="p-6 border-b border-gray-100">
-                  <h2 className="text-xl font-bold">All Transactions</h2>
-                  <button
-                    onClick={() => setShowPdfUploadModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <Upload size={18} />
-                    Import from PDF
-                  </button>
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">All Transactions</h2>
+                    <button
+                      onClick={() => setShowImportHelp(true)}
+                      className="flex items-center gap-1 px-2 py-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+                      title="Learn how to import transactions"
+                    >
+                      <HelpCircle size={18} />
+                    </button>
+                  </div>
+
+                  <div className="flex gap-3 flex-wrap">
+                    <button
+                      onClick={() => setShowPdfUploadModal(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                    >
+                      <Upload size={18} />
+                      Import XLSX
+                    </button>
+                    <a
+                      href="https://app.statementparser.ai/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+                    >
+                      <Upload size={18} />
+                      Convert Statement to XLSX
+                    </a>
+                  </div>
                 </div>
+
                 <div className="divide-y divide-gray-100">
                   {transactions.map((trans) => {
                     const cat = categories.find((c) => c.id === trans.category);
@@ -1279,6 +1303,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                 </div>
               </div>
             )}
+
 
             {currentScreen === "categories" && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -2336,6 +2361,101 @@ export default function FinanceTrackerApp({ user, onLogout }) {
           accounts={accounts}     
           onBulkAdd={handleBulkAddTransactions}
         />
+      )}
+
+      {showImportHelp && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white">
+              <h2 className="text-2xl font-bold text-gray-900">How to Import Transactions</h2>
+              <button
+                onClick={() => setShowImportHelp(false)}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Method 1 */}
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <span className="text-blue-600 font-bold text-sm">1</span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                      Import XLSX
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-2">
+                      Upload an Excel file directly with your bank transactions. Perfect if you already have your data in spreadsheet format.
+                    </p>
+                    <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-gray-700 space-y-1">
+                      <p><strong>Required columns:</strong> Date, Type, Description, Amount</p>
+                      <p><strong>Format:</strong> .xlsx files only</p>
+                      <p><strong>Auto-categorization:</strong> Transactions are automatically categorized based on merchant names</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-gray-200"></div>
+
+              {/* Method 2 */}
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                    <span className="text-purple-600 font-bold text-sm">2</span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                      Convert Statement to XLSX
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-2">
+                      Have a PDF bank statement? Use our converter tool to extract and convert it to an Excel file.
+                    </p>
+                    <div className="bg-purple-50 border border-purple-200 rounded p-3 text-xs text-gray-700 space-y-1">
+                      <p><strong>Supported formats:</strong> Bank statement PDFs</p>
+                      <p><strong>Service:</strong> Powered by Statement Parser</p>
+                      <p><strong>Next step:</strong> Download the generated XLSX and import it using the "Import XLSX" button</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Workflow */}
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                <h4 className="font-semibold text-gray-900 text-sm">Typical Workflow:</h4>
+                <div className="text-xs text-gray-700 space-y-1">
+                  <p>1. Have a PDF bank statement? → Click "Convert Statement to XLSX"</p>
+                  <p>2. Download the converted Excel file</p>
+                  <p>3. Return here and click "Import XLSX"</p>
+                  <p>4. Review and verify all transactions</p>
+                  <p>5. Import to your account</p>
+                </div>
+              </div>
+
+              {/* Tips */}
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-2">
+                <h4 className="font-semibold text-green-900 text-sm">💡 Tips:</h4>
+                <ul className="text-xs text-green-800 space-y-1">
+                  <li>• Review all highlighted (red) transactions before importing</li>
+                  <li>• You can edit, categorize, or delete any transaction</li>
+                  <li>• Categories are auto-suggested based on merchant names</li>
+                  <li>• All transactions marked as "ready" will be imported</li>
+                </ul>
+              </div>
+
+              <button
+                onClick={() => setShowImportHelp(false)}
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              >
+                Got it!
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
