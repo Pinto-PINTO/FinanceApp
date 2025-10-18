@@ -14,15 +14,7 @@ const firebaseConfig = {
   appId: process.env.REACT_APP_FIREBASE_APP_ID,
   measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID,
 };
-// const firebaseConfig = {
-//   apiKey: "AIzaSyCzkRtdKY0HM8XzYsY_0kih1-Ck58_ommc",
-//   authDomain: "financetrackerapp-75842.firebaseapp.com",
-//   projectId: "financetrackerapp-75842",
-//   storageBucket: "financetrackerapp-75842.firebasestorage.app",
-//   messagingSenderId: "1051498012571",
-//   appId: "1:1051498012571:web:589ce9080de392e2d8b3e",
-//   measurementId: "G-X85CK0RQ1E",
-// };
+
 
 // --- INITIALIZE FIREBASE ---
 const app = initializeApp(firebaseConfig);
@@ -34,9 +26,5 @@ let analytics;
 if (typeof window !== "undefined") {
   analytics = getAnalytics(app);
 }
-
-console.log("Firebase API Key:", process.env.REACT_APP_FIREBASE_API_KEY);
-console.log("Firebase Auth Domain:", process.env.REACT_APP_FIREBASE_AUTH_DOMAIN);
-
 
 export { app, db, auth, analytics };
