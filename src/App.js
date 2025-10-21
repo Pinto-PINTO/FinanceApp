@@ -323,22 +323,71 @@ export default function FinanceTrackerApp({ user, onLogout }) {
     if (
       !formData.amount ||
       formData.amount <= 0 ||
-      (formData.type === "expense" && !formData.category)
+      (formData.type === "expense" && !formData.category) ||
+      !formData.accountId
     )
       return;
-
+  
     const transactionData = {
       ...formData,
       amount: parseFloat(formData.amount),
     };
-
+  
     try {
+      const account = accounts.find(a => a.id === formData.accountId);
+      if (!account) {
+        alert("Please select a valid account");
+        return;
+      }
+  
       if (editingTransaction) {
+        // Calculate the OLD transaction's effect
+        const oldEffect = editingTransaction.type === "income" 
+          ? editingTransaction.amount 
+          : -editingTransaction.amount;
+  
+        // Calculate the NEW transaction's effect
+        const newEffect = transactionData.type === "income"
+          ? transactionData.amount
+          : -transactionData.amount;
+  
+        // Calculate the net change
+        const netChange = newEffect - oldEffect;
+  
+        const oldAccount = accounts.find(a => a.id === editingTransaction.accountId);
+        const newAccount = accounts.find(a => a.id === transactionData.accountId);
+  
+        // Update transaction in database
         await dbService.updateTransaction(
           user.uid,
           editingTransaction.id,
           transactionData
         );
+  
+        // Update account balances
+        if (oldAccount.id === newAccount.id) {
+          // Same account - just apply the net change
+          const updatedBalance = oldAccount.balance + netChange;
+          await dbService.updateAccount(user.uid, oldAccount.id, { balance: updatedBalance });
+          
+          setAccounts(accounts.map(a => 
+            a.id === oldAccount.id ? { ...a, balance: updatedBalance } : a
+          ));
+        } else {
+          // Different accounts - revert old and apply new
+          const oldAccountNewBalance = oldAccount.balance - oldEffect;
+          const newAccountNewBalance = newAccount.balance + newEffect;
+          
+          await dbService.updateAccount(user.uid, oldAccount.id, { balance: oldAccountNewBalance });
+          await dbService.updateAccount(user.uid, newAccount.id, { balance: newAccountNewBalance });
+          
+          setAccounts(accounts.map(a => {
+            if (a.id === oldAccount.id) return { ...a, balance: oldAccountNewBalance };
+            if (a.id === newAccount.id) return { ...a, balance: newAccountNewBalance };
+            return a;
+          }));
+        }
+  
         setTransactions(
           transactions.map((t) =>
             t.id === editingTransaction.id
@@ -346,15 +395,30 @@ export default function FinanceTrackerApp({ user, onLogout }) {
               : t
           )
         );
+  
         setEditingTransaction(null);
       } else {
+        // Add new transaction
         const newTransaction = await dbService.addTransaction(
           user.uid,
           transactionData
         );
+        
+        // Update account balance
+        const balanceChange = transactionData.type === "income"
+          ? transactionData.amount
+          : -transactionData.amount;
+        
+        const newBalance = account.balance + balanceChange;
+        
+        await dbService.updateAccount(user.uid, account.id, { balance: newBalance });
+  
         setTransactions([newTransaction, ...transactions]);
+        setAccounts(accounts.map(a => 
+          a.id === account.id ? { ...a, balance: newBalance } : a
+        ));
       }
-
+  
       setFormData({
         type: "expense",
         amount: "",
@@ -373,6 +437,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
   const handleBulkAddTransactions = async (transactionsArray) => {
     try {
       const addedTransactions = [];
+      const accountBalanceChanges = {};
       
       for (const transactionData of transactionsArray) {
         const newTransaction = await dbService.addTransaction(
@@ -380,14 +445,60 @@ export default function FinanceTrackerApp({ user, onLogout }) {
           transactionData
         );
         addedTransactions.push(newTransaction);
+  
+        // Track balance changes per account
+        if (!accountBalanceChanges[transactionData.accountId]) {
+          accountBalanceChanges[transactionData.accountId] = 0;
+        }
+        
+        const change = transactionData.type === "income" 
+          ? transactionData.amount 
+          : -transactionData.amount;
+        
+        accountBalanceChanges[transactionData.accountId] += change;
+      }
+  
+      // Update all affected account balances
+      const updatedAccounts = [...accounts];
+      for (const [accountId, change] of Object.entries(accountBalanceChanges)) {
+        const account = updatedAccounts.find(a => a.id === accountId);
+        if (account) {
+          const newBalance = account.balance + change;
+          await dbService.updateAccount(user.uid, accountId, { balance: newBalance });
+          account.balance = newBalance;
+        }
       }
       
+      setAccounts(updatedAccounts);
       setTransactions([...addedTransactions, ...transactions]);
       setShowPdfUploadModal(false);
       alert(`Successfully imported ${addedTransactions.length} transactions!`);
     } catch (error) {
       console.error("Error importing transactions:", error);
       alert("Error importing some transactions. Please try again.");
+    }
+  };
+
+  const handleDeleteTransactionWithBalance = async (transaction) => {
+    try {
+      // Revert the transaction's effect on account balance
+      const account = accounts.find(a => a.id === transaction.accountId);
+      if (account) {
+        const newBalance = transaction.type === "income"
+          ? account.balance - transaction.amount
+          : account.balance + transaction.amount;
+        
+        await dbService.updateAccount(user.uid, account.id, { balance: newBalance });
+        setAccounts(accounts.map(a => 
+          a.id === account.id ? { ...a, balance: newBalance } : a
+        ));
+      }
+  
+      await dbService.deleteTransaction(user.uid, transaction.id);
+      setTransactions(transactions.filter((t) => t.id !== transaction.id));
+    } catch (error) {
+      console.error("Error deleting transaction:", error);
+      alert("Error deleting transaction. Please try again.");
     }
   };
 
@@ -724,15 +835,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                             <Edit2 size={16} />
                           </button>
                           <button
-                            onClick={async () => {
-                              await dbService.deleteTransaction(
-                                user.uid,
-                                trans.id
-                              );
-                              setTransactions(
-                                transactions.filter((t) => t.id !== trans.id)
-                              );
-                            }}
+                            onClick={() => handleDeleteTransactionWithBalance(trans)}
                             className="p-2 hover:bg-red-100 rounded"
                           >
                             <Trash2 size={16} className="text-red-600" />
@@ -1679,15 +1782,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                                     <Edit2 size={16} className="text-blue-600" />
                                   </button>
                                   <button
-                                    onClick={async () => {
-                                      await dbService.deleteTransaction(
-                                        user.uid,
-                                        trans.id
-                                      );
-                                      setTransactions(
-                                        transactions.filter((t) => t.id !== trans.id)
-                                      );
-                                    }}
+                                    onClick={() => handleDeleteTransactionWithBalance(trans)}
                                     className="p-2 hover:bg-red-100 rounded-lg transition-colors"
                                     title="Delete"
                                   >
@@ -1867,86 +1962,162 @@ export default function FinanceTrackerApp({ user, onLogout }) {
             )}
 
             {currentScreen === "accounts" && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-bold">Bank Accounts</h2>
-                  <button
-                    onClick={() => {
-                      setAccountFormData({
-                        name: "",
-                        balance: "",
-                        color: "#4ECDC4",
-                        type: "checking",
-                      });
-                      setEditingAccount(null);
-                      setShowAccountForm(true);
-                    }}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium"
-                  >
-                    + Add
-                  </button>
-                </div>
-                <div className="space-y-3">
-                  {accounts.map((acc) => (
-                    <div
-                      key={acc.id}
-                      className="flex justify-between items-center p-4 border border-gray-100 rounded-lg"
-                      style={{ backgroundColor: acc.color + "10" }}
+              <div className="space-y-6">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-xl font-bold">Bank Accounts</h2>
+                    <button
+                      onClick={() => {
+                        setAccountFormData({
+                          name: "",
+                          balance: "",
+                          color: "#4ECDC4",
+                          type: "checking",
+                        });
+                        setEditingAccount(null);
+                        setShowAccountForm(true);
+                      }}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium"
                     >
-                      <div className="flex items-center gap-3">
+                      + Add
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    {accounts.map((acc) => (
+                      <div
+                        key={acc.id}
+                        className="border border-gray-100 rounded-lg overflow-hidden"
+                      >
                         <div
-                          className="w-10 h-10 rounded-lg flex items-center justify-center"
-                          style={{ backgroundColor: acc.color }}
+                          className="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50"
+                          style={{ backgroundColor: acc.color + "10" }}
+                          onClick={() => {
+                            if (selectedCategoryId === `account-${acc.id}`) {
+                              setSelectedCategoryId(null);
+                            } else {
+                              setSelectedCategoryId(`account-${acc.id}`);
+                            }
+                          }}
                         >
-                          <Wallet size={20} className="text-white" />
-                        </div>
-                        <div>
-                          <div className="font-medium">{acc.name}</div>
-                          <div className="text-xs text-gray-500 capitalize">
-                            {acc.type}
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="w-10 h-10 rounded-lg flex items-center justify-center"
+                              style={{ backgroundColor: acc.color }}
+                            >
+                              <Wallet size={20} className="text-white" />
+                            </div>
+                            <div>
+                              <div className="font-medium">{acc.name}</div>
+                              <div className="text-xs text-gray-500 capitalize">
+                                {acc.type}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div
+                              className="text-lg font-bold"
+                              style={{ color: acc.color }}
+                            >
+                              ${acc.balance.toFixed(2)}
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingAccount(acc);
+                                  setAccountFormData(acc);
+                                  setShowAccountForm(true);
+                                }}
+                                className="p-2 hover:bg-gray-200 rounded"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  const hasTransactions = transactions.some(
+                                    t => t.accountId === acc.id
+                                  );
+                                  if (hasTransactions) {
+                                    alert("Cannot delete account with transactions. Please delete or move all transactions first.");
+                                    return;
+                                  }
+                                  await dbService.deleteAccount(user.uid, acc.id);
+                                  setAccounts(accounts.filter((a) => a.id !== acc.id));
+                                }}
+                                className="p-2 hover:bg-red-100 rounded"
+                              >
+                                <Trash2 size={16} className="text-red-600" />
+                              </button>
+                            </div>
                           </div>
                         </div>
+                        
+                        {selectedCategoryId === `account-${acc.id}` && (
+                          <div className="border-t border-gray-200 bg-gray-50 p-4">
+                            <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                              Recent Transactions
+                            </h3>
+                            <div className="space-y-2 max-h-96 overflow-y-auto">
+                              {transactions
+                                .filter(t => t.accountId === acc.id)
+                                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                                .slice(0, 50)
+                                .map(trans => {
+                                  const cat = categories.find(c => c.id === trans.category);
+                                  return (
+                                    <div
+                                      key={trans.id}
+                                      className="bg-white rounded-lg p-3 border border-gray-100 hover:border-gray-300 transition-colors"
+                                    >
+                                      <div className="flex justify-between items-start">
+                                        <div className="flex items-start gap-2 flex-1">
+                                          <span className="text-xl">
+                                            {cat ? cat.icon : trans.type === "income" ? "💰" : "💸"}
+                                          </span>
+                                          <div className="flex-1 min-w-0">
+                                            <div className="text-sm font-medium text-gray-900 truncate">
+                                              {trans.note || cat?.name || "Transaction"}
+                                            </div>
+                                            <div className="text-xs text-gray-500">
+                                              {trans.date} • {cat?.name || trans.type}
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 ml-2">
+                                          <div
+                                            className={`text-sm font-bold whitespace-nowrap ${
+                                              trans.type === "income"
+                                                ? "text-green-600"
+                                                : "text-red-600"
+                                            }`}
+                                          >
+                                            {trans.type === "income" ? "+" : "-"}$
+                                            {trans.amount.toFixed(2)}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              {transactions.filter(t => t.accountId === acc.id).length === 0 && (
+                                <div className="text-center py-8 text-gray-500 text-sm">
+                                  No transactions yet
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div
-                          className="text-lg font-bold"
-                          style={{ color: acc.color }}
-                        >
-                          ${acc.balance.toFixed(2)}
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              setEditingAccount(acc);
-                              setAccountFormData(acc);
-                              setShowAccountForm(true);
-                            }}
-                            className="p-2 hover:bg-gray-200 rounded"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button
-                            onClick={async () => {
-                              await dbService.deleteAccount(user.uid, acc.id);
-                              setAccounts(
-                                accounts.filter((a) => a.id !== acc.id)
-                              );
-                            }}
-                            className="p-2 hover:bg-red-100 rounded"
-                          >
-                            <Trash2 size={16} className="text-red-600" />
-                          </button>
-                        </div>
-                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-6 pt-6 border-t">
+                    <div className="flex justify-between">
+                      <span className="font-medium">Total Balance</span>
+                      <span className="text-2xl font-bold">
+                        ${stats.totalAccountBalance.toFixed(2)}
+                      </span>
                     </div>
-                  ))}
-                </div>
-                <div className="mt-6 pt-6 border-t">
-                  <div className="flex justify-between">
-                    <span className="font-medium">Total Balance</span>
-                    <span className="text-2xl font-bold">
-                      ${stats.totalAccountBalance.toFixed(2)}
-                    </span>
                   </div>
                 </div>
               </div>
