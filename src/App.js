@@ -806,24 +806,28 @@ export default function FinanceTrackerApp({ user, onLogout }) {
   };
 
   // Account Detail View Component
-  // Account Detail View Component with Pagination
-  const AccountDetailView = ({ account, onBack }) => {
+  const AccountDetailView = ({ account, setViewingAccountDetail, setSelectedAccountId }) => {
     const [filter, setFilter] = useState("all");
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
-
+  
+    console.log("=== AccountDetailView RENDERED ===");
+    console.log("Account:", account?.name);
+    console.log("viewingAccountDetail:", viewingAccountDetail);
+    console.log("selectedAccountId:", selectedAccountId);
+  
     // Get transactions for this account in current month
     const accountTransactions = getMonthTransactions().filter(t => t.accountId === account.id);
     const accountTransfers = transfers.filter(t => 
       (t.fromAccountId === account.id || t.toAccountId === account.id) &&
       t.date.startsWith(currentMonth)
     );
-
+  
     // Apply filters
     const getFilteredItems = () => {
       let filteredTrans = [];
       let filteredTransf = [];
-
+  
       if (filter === "all") {
         filteredTrans = accountTransactions;
         filteredTransf = accountTransfers;
@@ -834,29 +838,29 @@ export default function FinanceTrackerApp({ user, onLogout }) {
       } else if (filter === "transfer") {
         filteredTransf = accountTransfers;
       }
-
+  
       // Combine and sort
       const combined = [
         ...filteredTrans.map(t => ({ ...t, itemType: 'transaction' })),
         ...filteredTransf.map(t => ({ ...t, itemType: 'transfer' }))
       ].sort((a, b) => new Date(b.date) - new Date(a.date));
-
+  
       return combined;
     };
-
+  
     const allItems = getFilteredItems();
-
+  
     // Pagination logic
     const totalPages = Math.ceil(allItems.length / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     const paginatedItems = allItems.slice(startIndex, endIndex);
-
+  
     // Reset to page 1 when filter changes
-    React.useEffect(() => {
+    useEffect(() => {
       setCurrentPage(1);
     }, [filter]);
-
+  
     // Calculate stats
     const totalIncome = accountTransactions
       .filter(t => t.type === "income")
@@ -865,29 +869,53 @@ export default function FinanceTrackerApp({ user, onLogout }) {
     const totalExpenses = accountTransactions
       .filter(t => t.type === "expense")
       .reduce((sum, t) => sum + t.amount, 0);
-
+  
     const transfersIn = accountTransfers
       .filter(t => t.toAccountId === account.id)
       .reduce((sum, t) => sum + t.amount, 0);
-
+  
     const transfersOut = accountTransfers
       .filter(t => t.fromAccountId === account.id)
       .reduce((sum, t) => sum + t.amount, 0);
-
+  
+    const handleBackClick = (e) => {
+      console.log("=== HANDLER CALLED ===");
+      console.log("Event:", e);
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      console.log("Calling setViewingAccountDetail(false)");
+      console.log("Calling setSelectedAccountId(null)");
+      setViewingAccountDetail(false);
+      setSelectedAccountId(null);
+    };
+  
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" style={{ position: 'relative', zIndex: 1 }}>
         {/* Back Button */}
-        <button
-          onClick={() => {
-            onBack();
-            console.log("Back btn clicked")
-          }}
-          className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium hover:bg-blue-50 px-3 py-2 rounded-lg transition-colors"
-        >
-          <ChevronLeft size={20} />
-          Back to Accounts
-        </button>
-
+        <div style={{ position: 'relative', zIndex: 10 }}>
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              console.log("=== MOUSE DOWN ===");
+              e.stopPropagation();
+            }}
+            onClick={handleBackClick}
+            className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium hover:bg-blue-50 px-3 py-2 rounded-lg transition-colors"
+            style={{ 
+              cursor: 'pointer',
+              pointerEvents: 'auto',
+              position: 'relative',
+              zIndex: 100,
+              touchAction: 'manipulation'
+            }}
+          >
+            <ChevronLeft size={20} />
+            Back to Accounts
+          </button>
+        </div>
+  
         {/* Account Header */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center gap-4 mb-6">
@@ -902,7 +930,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
               <p className="text-sm text-gray-500 capitalize">{account.type} Account</p>
             </div>
           </div>
-
+  
           {/* Stats Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-blue-50 p-4 rounded-lg">
@@ -931,7 +959,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
             </div>
           </div>
         </div>
-
+  
         {/* Filters and Transactions */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
@@ -942,55 +970,83 @@ export default function FinanceTrackerApp({ user, onLogout }) {
             {/* Filter Buttons */}
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => setFilter("all")}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log("Filter clicked: all");
+                  setFilter("all");
+                }}
                 className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
                   filter === "all"
                     ? "bg-blue-600 text-white shadow-md"
                     : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
                 }`}
+                style={{ cursor: 'pointer', pointerEvents: 'auto' }}
               >
                 All ({accountTransactions.length + accountTransfers.length})
               </button>
               <button
-                onClick={() => setFilter("expense")}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log("Filter clicked: expense");
+                  setFilter("expense");
+                }}
                 className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
                   filter === "expense"
                     ? "bg-red-600 text-white shadow-md"
                     : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
                 }`}
+                style={{ cursor: 'pointer', pointerEvents: 'auto' }}
               >
                 Expenses ({accountTransactions.filter(t => t.type === "expense").length})
               </button>
               <button
-                onClick={() => setFilter("income")}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log("Filter clicked: income");
+                  setFilter("income");
+                }}
                 className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
                   filter === "income"
                     ? "bg-green-600 text-white shadow-md"
                     : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
                 }`}
+                style={{ cursor: 'pointer', pointerEvents: 'auto' }}
               >
                 Income ({accountTransactions.filter(t => t.type === "income").length})
               </button>
               <button
-                onClick={() => setFilter("transfer")}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log("Filter clicked: transfer");
+                  setFilter("transfer");
+                }}
                 className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
                   filter === "transfer"
                     ? "bg-purple-600 text-white shadow-md"
                     : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
                 }`}
+                style={{ cursor: 'pointer', pointerEvents: 'auto' }}
               >
                 Transfers ({accountTransfers.length})
               </button>
             </div>
           </div>
-
+  
           {/* Results Summary */}
           {allItems.length > 0 && (
             <div className="mb-4 text-sm text-gray-600">
               Showing {startIndex + 1} - {Math.min(endIndex, allItems.length)} of {allItems.length} transactions
             </div>
           )}
-
+  
           {/* Transactions List */}
           <div className="space-y-2 mb-6">
             {paginatedItems.length > 0 ? (
@@ -1078,23 +1134,29 @@ export default function FinanceTrackerApp({ user, onLogout }) {
               })
             ) : (
               <div className="text-center py-12 text-gray-500">
-                <div className="text-4xl mb-2">📭</div>
+                <div className="text-4xl mb-2">🔭</div>
                 <p className="text-sm">No {filter !== "all" ? filter + " " : ""}transactions this month</p>
               </div>
             )}
           </div>
-
+  
           {/* Pagination Controls */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between border-t pt-4">
               <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setCurrentPage(prev => Math.max(1, prev - 1));
+                }}
                 disabled={currentPage === 1}
                 className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
                   currentPage === 1
                     ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                     : "bg-blue-600 text-white hover:bg-blue-700"
                 }`}
+                style={{ pointerEvents: 'auto' }}
               >
                 Previous
               </button>
@@ -1103,26 +1165,38 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
                   <button
                     key={page}
-                    onClick={() => setCurrentPage(page)}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setCurrentPage(page);
+                    }}
                     className={`w-10 h-10 rounded-lg font-medium text-sm transition-colors ${
                       currentPage === page
                         ? "bg-blue-600 text-white"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
+                    style={{ cursor: 'pointer', pointerEvents: 'auto' }}
                   >
                     {page}
                   </button>
                 ))}
               </div>
-
+  
               <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setCurrentPage(prev => Math.min(totalPages, prev + 1));
+                }}
                 disabled={currentPage === totalPages}
                 className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
                   currentPage === totalPages
                     ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                     : "bg-blue-600 text-white hover:bg-blue-700"
                 }`}
+                style={{ pointerEvents: 'auto' }}
               >
                 Next
               </button>
@@ -2451,11 +2525,8 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                   /* Account Detail View */
                   <AccountDetailView 
                     account={accounts.find(a => a.id === selectedAccountId)}
-                    onBack={() => {
-                      console.log("Back button clicked - resetting states");
-                      setViewingAccountDetail(false);
-                      setSelectedAccountId(null);
-                    }}
+                    setViewingAccountDetail={setViewingAccountDetail}
+                    setSelectedAccountId={setSelectedAccountId}
                   />
                 ) : (
                   /* Accounts List View */
