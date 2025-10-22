@@ -2166,83 +2166,6 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                   </div>
                 </div>
 
-                {/* Transfer History */}
-                {transfers.length > 0 && (
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div className="p-6 border-b border-gray-100">
-                      <h3 className="text-lg font-semibold text-gray-800">Transfer History</h3>
-                      <p className="text-sm text-gray-500 mt-1">Recent money transfers between accounts</p>
-                    </div>
-                    <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
-                      {transfers.slice(0, 20).map((transfer) => {
-                        const fromAcc = accounts.find(a => a.id === transfer.fromAccountId);
-                        const toAcc = accounts.find(a => a.id === transfer.toAccountId);
-                        return (
-                          <div
-                            key={transfer.id}
-                            className="p-4 hover:bg-gray-50 transition-colors"
-                          >
-                            <div className="flex justify-between items-center">
-                              <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl flex items-center justify-center shadow-sm">
-                                  <ArrowRight size={24} className="text-white" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="font-semibold text-gray-900 mb-1 flex items-center gap-2 flex-wrap">
-                                    <span 
-                                      className="px-2 py-0.5 rounded text-xs font-medium truncate"
-                                      style={{ 
-                                        backgroundColor: fromAcc?.color + "20", 
-                                        color: fromAcc?.color 
-                                      }}
-                                    >
-                                      {fromAcc?.name || "Unknown"}
-                                    </span>
-                                    <ArrowRight size={14} className="text-gray-400 flex-shrink-0" />
-                                    <span 
-                                      className="px-2 py-0.5 rounded text-xs font-medium truncate"
-                                      style={{ 
-                                        backgroundColor: toAcc?.color + "20", 
-                                        color: toAcc?.color 
-                                      }}
-                                    >
-                                      {toAcc?.name || "Unknown"}
-                                    </span>
-                                  </div>
-                                  <div className="text-sm text-gray-600 truncate">
-                                    {transfer.note}
-                                  </div>
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    {new Date(transfer.date).toLocaleDateString('en-US', { 
-                                      month: 'short', 
-                                      day: 'numeric', 
-                                      year: 'numeric' 
-                                    })}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-3 flex-shrink-0 ml-4">
-                                <div className="text-right">
-                                  <div className="text-lg font-bold text-purple-600">
-                                    ${transfer.amount.toFixed(2)}
-                                  </div>
-                                </div>
-                                <button
-                                  onClick={() => handleDeleteTransfer(transfer)}
-                                  className="p-2 hover:bg-red-100 rounded-lg transition-colors group"
-                                  title="Reverse Transfer"
-                                >
-                                  <Trash2 size={16} className="text-red-600 group-hover:scale-110 transition-transform" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
                 {/* Accounts List */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                   <div className="flex justify-between items-center mb-6">
@@ -2394,6 +2317,83 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                     ))}
                   </div>
                 </div>
+
+                {/* Transfer History */}
+                {transfers.length > 0 && (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="p-6 border-b border-gray-100">
+                      <h3 className="text-lg font-semibold text-gray-800">Transfer History</h3>
+                      <p className="text-sm text-gray-500 mt-1">Recent money transfers between accounts</p>
+                    </div>
+                    <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+                      {transfers.slice(0, 20).map((transfer) => {
+                        const fromAcc = accounts.find(a => a.id === transfer.fromAccountId);
+                        const toAcc = accounts.find(a => a.id === transfer.toAccountId);
+                        return (
+                          <div
+                            key={transfer.id}
+                            className="p-4 hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="flex justify-between items-center">
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl flex items-center justify-center shadow-sm">
+                                  <ArrowRight size={24} className="text-white" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-semibold text-gray-900 mb-1 flex items-center gap-2 flex-wrap">
+                                    <span 
+                                      className="px-2 py-0.5 rounded text-xs font-medium truncate"
+                                      style={{ 
+                                        backgroundColor: fromAcc?.color + "20", 
+                                        color: fromAcc?.color 
+                                      }}
+                                    >
+                                      {fromAcc?.name || "Unknown"}
+                                    </span>
+                                    <ArrowRight size={14} className="text-gray-400 flex-shrink-0" />
+                                    <span 
+                                      className="px-2 py-0.5 rounded text-xs font-medium truncate"
+                                      style={{ 
+                                        backgroundColor: toAcc?.color + "20", 
+                                        color: toAcc?.color 
+                                      }}
+                                    >
+                                      {toAcc?.name || "Unknown"}
+                                    </span>
+                                  </div>
+                                  <div className="text-sm text-gray-600 truncate">
+                                    {transfer.note}
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {new Date(transfer.date).toLocaleDateString('en-US', { 
+                                      month: 'short', 
+                                      day: 'numeric', 
+                                      year: 'numeric' 
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3 flex-shrink-0 ml-4">
+                                <div className="text-right">
+                                  <div className="text-lg font-bold text-purple-600">
+                                    ${transfer.amount.toFixed(2)}
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => handleDeleteTransfer(transfer)}
+                                  className="p-2 hover:bg-red-100 rounded-lg transition-colors group"
+                                  title="Reverse Transfer"
+                                >
+                                  <Trash2 size={16} className="text-red-600 group-hover:scale-110 transition-transform" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
