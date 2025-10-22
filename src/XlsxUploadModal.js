@@ -251,12 +251,12 @@ export default function XlsxUploadModal({
         accountId: t.accountId,
         category: t.type === "expense" ? (t.subCategory || t.category || "") : "",
       }));
-
+  
     if (readyTransactions.length === 0) {
       alert("No transactions ready to import. Please review highlighted rows.");
       return;
     }
-
+  
     setIsBulkAdding(true);
     await onBulkAdd(readyTransactions);
     setIsBulkAdding(false);
