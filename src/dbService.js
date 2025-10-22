@@ -123,3 +123,29 @@ export const updateUserPreferences = async (userId, preferences) => {
   const userRef = doc(db, "users", userId);
   await updateDoc(userRef, { preferences });
 };
+
+// ===== TRANSFERS =====
+// Replace the existing getTransfers function with this:
+export const getTransfers = async (userId) => {
+  try {
+    const transfersRef = collection(db, "users", userId, "transfers");
+    const q = query(transfersRef, orderBy("date", "desc"));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  } catch (error) {
+    console.error("Error fetching transfers:", error);
+    // Return empty array if collection doesn't exist yet
+    return [];
+  }
+};
+
+export const addTransfer = async (userId, transferData) => {
+  const transfersRef = collection(db, "users", userId, "transfers");
+  const docRef = await addDoc(transfersRef, transferData);
+  return { id: docRef.id, ...transferData };
+};
+
+export const deleteTransfer = async (userId, transferId) => {
+  const transferRef = doc(db, "users", userId, "transfers", transferId);
+  await deleteDoc(transferRef);
+};

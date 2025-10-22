@@ -14,9 +14,11 @@ import {
   ChevronLeft,
   Upload,
   HelpCircle,
+  ArrowRight,
 } from "lucide-react";
 import * as dbService from "./dbService";
 import { getUserPreferences, updateUserPreferences } from "./dbService";
+import { getTransfers, addTransfer, deleteTransfer } from "./dbService";
 import XlsxUploadModal from "./XlsxUploadModal";
 
 export default function FinanceTrackerApp({ user, onLogout }) {
@@ -79,6 +81,16 @@ export default function FinanceTrackerApp({ user, onLogout }) {
   const [currentMonth, setCurrentMonth] = useState(
     new Date().toISOString().slice(0, 7) // "YYYY-MM" format
   );
+
+  const [transfers, setTransfers] = useState([]);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferFormData, setTransferFormData] = useState({
+    fromAccountId: "",
+    toAccountId: "",
+    amount: "",
+    note: "",
+    date: new Date().toISOString().split("T")[0],
+  });
 
   const [transactionFilters, setTransactionFilters] = useState({
     dateFrom: "",
@@ -215,19 +227,21 @@ export default function FinanceTrackerApp({ user, onLogout }) {
   useEffect(() => {
     const loadData = async () => {
       if (!user) return;
-
+  
       try {
-        const [categoriesData, transactionsData, accountsData] =
+        const [categoriesData, transactionsData, accountsData, transfersData] =
           await Promise.all([
             dbService.getCategories(user.uid),
             dbService.getTransactions(user.uid),
             dbService.getAccounts(user.uid),
+            dbService.getTransfers(user.uid).catch(() => []), // Return empty array if fails
           ]);
-
+  
         setCategories(categoriesData);
         setTransactions(transactionsData);
         setAccounts(accountsData);
-
+        setTransfers(transfersData || []); // Fallback to empty array
+  
         // Set default account if available
         if (accountsData.length > 0) {
           setFormData((prev) => ({
@@ -235,13 +249,13 @@ export default function FinanceTrackerApp({ user, onLogout }) {
             accountId: accountsData[0].id,
           }));
         }
-
+  
         setDataLoaded(true);
       } catch (error) {
         console.error("Error loading data:", error);
       }
     };
-
+  
     loadData();
   }, [user]);
 
@@ -655,6 +669,137 @@ export default function FinanceTrackerApp({ user, onLogout }) {
       await updateUserPreferences(user.uid, { homeLayout: layout });
     } catch (error) {
       console.error("Error saving layout preference:", error);
+    }
+  };
+
+  const customConfirm = (message) => {
+    // WARNING: This is a temporary fix for the linter.
+    // In a production React application, you should replace this 
+    // with a state-controlled, non-blocking confirmation modal component 
+    // to properly handle asynchronous user confirmation.
+    return window.confirm(message);
+  };
+
+  const handleTransfer = async () => {
+    if (
+      !transferFormData.fromAccountId ||
+      !transferFormData.toAccountId ||
+      !transferFormData.amount ||
+      transferFormData.amount <= 0
+    ) {
+      alert("Please fill in all transfer details");
+      return;
+    }
+  
+    if (transferFormData.fromAccountId === transferFormData.toAccountId) {
+      alert("Cannot transfer to the same account");
+      return;
+    }
+  
+    try {
+
+      if (!user || !user.uid) {
+        alert("User not authenticated properly");
+        console.error("User object:", user);
+        return;
+      }
+      
+      console.log("User ID:", user.uid); // Should match your Firestore path
+      const amount = parseFloat(parseFloat(transferFormData.amount).toFixed(2));
+      const fromAccount = accounts.find(a => a.id === transferFormData.fromAccountId);
+      const toAccount = accounts.find(a => a.id === transferFormData.toAccountId);
+  
+      if (!fromAccount || !toAccount) {
+        alert("Invalid accounts selected");
+        return;
+      }
+  
+      if (fromAccount.balance < amount) {
+        alert(`Insufficient funds in ${fromAccount.name}. Available: $${fromAccount.balance.toFixed(2)}`);
+        return;
+      }
+  
+      // Create transfer record
+      const transferData = {
+        fromAccountId: transferFormData.fromAccountId,
+        toAccountId: transferFormData.toAccountId,
+        amount: amount,
+        note: transferFormData.note || "Account Transfer",
+        date: transferFormData.date,
+        timestamp: new Date().toISOString(),
+      };
+  
+      console.log("Creating transfer:", transferData); // Debug log
+  
+      const newTransfer = await addTransfer(user.uid, transferData);
+      console.log("Transfer created:", newTransfer); // Debug log
+  
+      // Update account balances
+      const newFromBalance = parseFloat((fromAccount.balance - amount).toFixed(2));
+      const newToBalance = parseFloat((toAccount.balance + amount).toFixed(2));
+  
+      console.log("Updating balances:", { newFromBalance, newToBalance }); // Debug log
+  
+      await dbService.updateAccount(user.uid, fromAccount.id, { balance: newFromBalance });
+      await dbService.updateAccount(user.uid, toAccount.id, { balance: newToBalance });
+  
+      // Update state
+      setAccounts(accounts.map(a => {
+        if (a.id === fromAccount.id) return { ...a, balance: newFromBalance };
+        if (a.id === toAccount.id) return { ...a, balance: newToBalance };
+        return a;
+      }));
+  
+      setTransfers([newTransfer, ...transfers]);
+  
+      // Reset form
+      setTransferFormData({
+        fromAccountId: "",
+        toAccountId: "",
+        amount: "",
+        note: "",
+        date: new Date().toISOString().split("T")[0],
+      });
+      setShowTransferModal(false);
+      
+      alert("Transfer completed successfully!");
+    } catch (error) {
+      console.error("Error processing transfer:", error);
+      alert(`Error processing transfer: ${error.message}`);
+    }
+  };
+
+  const handleDeleteTransfer = async (transfer) => {
+    if (!customConfirm("Delete this transfer? This will reverse the transaction.")) return;
+
+    try {
+      const fromAccount = accounts.find(a => a.id === transfer.fromAccountId);
+      const toAccount = accounts.find(a => a.id === transfer.toAccountId);
+
+      if (!fromAccount || !toAccount) {
+        alert("Cannot reverse transfer - accounts not found");
+        return;
+      }
+
+      // Reverse the transfer
+      const newFromBalance = parseFloat((fromAccount.balance + transfer.amount).toFixed(2));
+      const newToBalance = parseFloat((toAccount.balance - transfer.amount).toFixed(2));
+
+      await dbService.updateAccount(user.uid, fromAccount.id, { balance: newFromBalance });
+      await dbService.updateAccount(user.uid, toAccount.id, { balance: newToBalance });
+      await deleteTransfer(user.uid, transfer.id);
+
+      // Update state
+      setAccounts(accounts.map(a => {
+        if (a.id === fromAccount.id) return { ...a, balance: newFromBalance };
+        if (a.id === toAccount.id) return { ...a, balance: newToBalance };
+        return a;
+      }));
+
+      setTransfers(transfers.filter(t => t.id !== transfer.id));
+    } catch (error) {
+      console.error("Error deleting transfer:", error);
+      alert("Error deleting transfer. Please try again.");
     }
   };
 
@@ -1972,24 +2117,139 @@ export default function FinanceTrackerApp({ user, onLogout }) {
 
             {currentScreen === "accounts" && (
               <div className="space-y-6">
+                {/* Header with Transfer Button */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h2 className="text-xl font-bold">Bank Accounts</h2>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Total Balance: <span className="font-semibold text-gray-900">${stats.totalAccountBalance.toFixed(2)}</span>
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => {
+                          setTransferFormData({
+                            fromAccountId: accounts[0]?.id || "",
+                            toAccountId: accounts[1]?.id || "",
+                            amount: "",
+                            note: "",
+                            date: new Date().toISOString().split("T")[0],
+                          });
+                          setShowTransferModal(true);
+                        }}
+                        disabled={accounts.length < 2}
+                        className={`bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:shadow-lg transition-all ${
+                          accounts.length < 2 ? "opacity-50 cursor-not-allowed" : ""
+                        }`}
+                        title={accounts.length < 2 ? "Need at least 2 accounts to transfer" : "Transfer money between accounts"}
+                      >
+                        <ArrowRight size={18} />
+                        Transfer Money
+                      </button>
+                      <button
+                        onClick={() => {
+                          setAccountFormData({
+                            name: "",
+                            balance: "",
+                            color: "#4ECDC4",
+                            type: "checking",
+                          });
+                          setEditingAccount(null);
+                          setShowAccountForm(true);
+                        }}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                      >
+                        + Add Account
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Transfer History */}
+                {transfers.length > 0 && (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="p-6 border-b border-gray-100">
+                      <h3 className="text-lg font-semibold text-gray-800">Transfer History</h3>
+                      <p className="text-sm text-gray-500 mt-1">Recent money transfers between accounts</p>
+                    </div>
+                    <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+                      {transfers.slice(0, 20).map((transfer) => {
+                        const fromAcc = accounts.find(a => a.id === transfer.fromAccountId);
+                        const toAcc = accounts.find(a => a.id === transfer.toAccountId);
+                        return (
+                          <div
+                            key={transfer.id}
+                            className="p-4 hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="flex justify-between items-center">
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl flex items-center justify-center shadow-sm">
+                                  <ArrowRight size={24} className="text-white" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-semibold text-gray-900 mb-1 flex items-center gap-2 flex-wrap">
+                                    <span 
+                                      className="px-2 py-0.5 rounded text-xs font-medium truncate"
+                                      style={{ 
+                                        backgroundColor: fromAcc?.color + "20", 
+                                        color: fromAcc?.color 
+                                      }}
+                                    >
+                                      {fromAcc?.name || "Unknown"}
+                                    </span>
+                                    <ArrowRight size={14} className="text-gray-400 flex-shrink-0" />
+                                    <span 
+                                      className="px-2 py-0.5 rounded text-xs font-medium truncate"
+                                      style={{ 
+                                        backgroundColor: toAcc?.color + "20", 
+                                        color: toAcc?.color 
+                                      }}
+                                    >
+                                      {toAcc?.name || "Unknown"}
+                                    </span>
+                                  </div>
+                                  <div className="text-sm text-gray-600 truncate">
+                                    {transfer.note}
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {new Date(transfer.date).toLocaleDateString('en-US', { 
+                                      month: 'short', 
+                                      day: 'numeric', 
+                                      year: 'numeric' 
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3 flex-shrink-0 ml-4">
+                                <div className="text-right">
+                                  <div className="text-lg font-bold text-purple-600">
+                                    ${transfer.amount.toFixed(2)}
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => handleDeleteTransfer(transfer)}
+                                  className="p-2 hover:bg-red-100 rounded-lg transition-colors group"
+                                  title="Reverse Transfer"
+                                >
+                                  <Trash2 size={16} className="text-red-600 group-hover:scale-110 transition-transform" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Accounts List */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold">Bank Accounts</h2>
-                    <button
-                      onClick={() => {
-                        setAccountFormData({
-                          name: "",
-                          balance: "",
-                          color: "#4ECDC4",
-                          type: "checking",
-                        });
-                        setEditingAccount(null);
-                        setShowAccountForm(true);
-                      }}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium"
-                    >
-                      + Add
-                    </button>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-800">Your Accounts</h3>
+                      <p className="text-sm text-gray-500 mt-1">{accounts.length} account{accounts.length !== 1 ? "s" : ""} total</p>
+                    </div>
                   </div>
                   <div className="space-y-3">
                     {accounts.map((acc) => (
@@ -1998,7 +2258,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                         className="border border-gray-100 rounded-lg overflow-hidden"
                       >
                         <div
-                          className="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50"
+                          className="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50 transition-colors"
                           style={{ backgroundColor: acc.color + "10" }}
                           onClick={() => {
                             if (selectedCategoryId === `account-${acc.id}`) {
@@ -2010,24 +2270,30 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                         >
                           <div className="flex items-center gap-3">
                             <div
-                              className="w-10 h-10 rounded-lg flex items-center justify-center"
+                              className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm"
                               style={{ backgroundColor: acc.color }}
                             >
-                              <Wallet size={20} className="text-white" />
+                              <Wallet size={24} className="text-white" />
                             </div>
                             <div>
-                              <div className="font-medium">{acc.name}</div>
-                              <div className="text-xs text-gray-500 capitalize">
+                              <div className="font-semibold text-gray-900">{acc.name}</div>
+                              <div className="text-xs text-gray-500 capitalize flex items-center gap-2">
                                 {acc.type}
+                                <span className="text-gray-400">•</span>
+                                <span className="text-gray-600">
+                                  {transactions.filter(t => t.accountId === acc.id).length} transactions
+                                </span>
                               </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-4">
-                            <div
-                              className="text-lg font-bold"
-                              style={{ color: acc.color }}
-                            >
-                              ${acc.balance.toFixed(2)}
+                            <div className="text-right">
+                              <div
+                                className="text-2xl font-bold"
+                                style={{ color: acc.color }}
+                              >
+                                ${acc.balance.toFixed(2)}
+                              </div>
                             </div>
                             <div className="flex gap-2">
                               <button
@@ -2037,7 +2303,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                                   setAccountFormData(acc);
                                   setShowAccountForm(true);
                                 }}
-                                className="p-2 hover:bg-gray-200 rounded"
+                                className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
                               >
                                 <Edit2 size={16} />
                               </button>
@@ -2047,14 +2313,21 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                                   const hasTransactions = transactions.some(
                                     t => t.accountId === acc.id
                                   );
-                                  if (hasTransactions) {
-                                    alert("Cannot delete account with transactions. Please delete or move all transactions first.");
+                                  const hasTransfers = transfers.some(
+                                    t => t.fromAccountId === acc.id || t.toAccountId === acc.id
+                                  );
+                                  
+                                  if (hasTransactions || hasTransfers) {
+                                    alert("Cannot delete account with transactions or transfers. Please delete or move all transactions first.");
                                     return;
                                   }
+                                  
+                                  if (!customConfirm(`Delete ${acc.name}?`)) return;
+                                  
                                   await dbService.deleteAccount(user.uid, acc.id);
                                   setAccounts(accounts.filter((a) => a.id !== acc.id));
                                 }}
-                                className="p-2 hover:bg-red-100 rounded"
+                                className="p-2 hover:bg-red-100 rounded-lg transition-colors"
                               >
                                 <Trash2 size={16} className="text-red-600" />
                               </button>
@@ -2064,9 +2337,9 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                         
                         {selectedCategoryId === `account-${acc.id}` && (
                           <div className="border-t border-gray-200 bg-gray-50 p-4">
-                            <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                            <h4 className="text-sm font-semibold text-gray-700 mb-3">
                               Recent Transactions
-                            </h3>
+                            </h4>
                             <div className="space-y-2 max-h-96 overflow-y-auto">
                               {transactions
                                 .filter(t => t.accountId === acc.id)
@@ -2080,8 +2353,8 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                                       className="bg-white rounded-lg p-3 border border-gray-100 hover:border-gray-300 transition-colors"
                                     >
                                       <div className="flex justify-between items-start">
-                                        <div className="flex items-start gap-2 flex-1">
-                                          <span className="text-xl">
+                                        <div className="flex items-start gap-2 flex-1 min-w-0">
+                                          <span className="text-xl flex-shrink-0">
                                             {cat ? cat.icon : trans.type === "income" ? "💰" : "💸"}
                                           </span>
                                           <div className="flex-1 min-w-0">
@@ -2093,7 +2366,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                                             </div>
                                           </div>
                                         </div>
-                                        <div className="flex items-center gap-2 ml-2">
+                                        <div className="flex items-center gap-2 ml-2 flex-shrink-0">
                                           <div
                                             className={`text-sm font-bold whitespace-nowrap ${
                                               trans.type === "income"
@@ -2119,14 +2392,6 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                         )}
                       </div>
                     ))}
-                  </div>
-                  <div className="mt-6 pt-6 border-t">
-                    <div className="flex justify-between">
-                      <span className="font-medium">Total Balance</span>
-                      <span className="text-2xl font-bold">
-                        ${stats.totalAccountBalance.toFixed(2)}
-                      </span>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -3041,6 +3306,113 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                 className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
               >
                 Got it!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Modal */}
+      {showTransferModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Transfer Money</h2>
+              <button
+                onClick={() => setShowTransferModal(false)}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">From Account</label>
+                <select
+                  value={transferFormData.fromAccountId}
+                  onChange={(e) =>
+                    setTransferFormData({ ...transferFormData, fromAccountId: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg mt-1 text-sm"
+                >
+                  <option value="">Select account</option>
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name} (${acc.balance.toFixed(2)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex justify-center">
+                <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
+                  <ArrowRight size={20} className="text-white transform rotate-90" />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium">To Account</label>
+                <select
+                  value={transferFormData.toAccountId}
+                  onChange={(e) =>
+                    setTransferFormData({ ...transferFormData, toAccountId: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg mt-1 text-sm"
+                >
+                  <option value="">Select account</option>
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name} (${acc.balance.toFixed(2)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium">Amount</label>
+                <input
+                  type="number"
+                  value={transferFormData.amount}
+                  onChange={(e) =>
+                    setTransferFormData({ ...transferFormData, amount: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg mt-1 text-sm"
+                  placeholder="0.00"
+                  step="0.01"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium">Date</label>
+                <input
+                  type="date"
+                  value={transferFormData.date}
+                  onChange={(e) =>
+                    setTransferFormData({ ...transferFormData, date: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg mt-1 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium">Note (Optional)</label>
+                <input
+                  type="text"
+                  value={transferFormData.note}
+                  onChange={(e) =>
+                    setTransferFormData({ ...transferFormData, note: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg mt-1 text-sm"
+                  placeholder="e.g., Monthly savings"
+                />
+              </div>
+
+              <button
+                onClick={handleTransfer}
+                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-lg font-medium hover:shadow-lg transition-all"
+              >
+                Transfer ${transferFormData.amount || "0.00"}
               </button>
             </div>
           </div>
