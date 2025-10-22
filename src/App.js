@@ -330,7 +330,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
   
     const transactionData = {
       ...formData,
-      amount: parseFloat(formData.amount),
+      amount: parseFloat(parseFloat(formData.amount).toFixed(2)), // Fixed: Ensure exact decimal precision
     };
   
     try {
@@ -343,16 +343,16 @@ export default function FinanceTrackerApp({ user, onLogout }) {
       if (editingTransaction) {
         // Calculate the OLD transaction's effect
         const oldEffect = editingTransaction.type === "income" 
-          ? editingTransaction.amount 
-          : -editingTransaction.amount;
+          ? parseFloat(editingTransaction.amount.toFixed(2))
+          : -parseFloat(editingTransaction.amount.toFixed(2));
   
         // Calculate the NEW transaction's effect
         const newEffect = transactionData.type === "income"
-          ? transactionData.amount
-          : -transactionData.amount;
+          ? parseFloat(transactionData.amount.toFixed(2))
+          : -parseFloat(transactionData.amount.toFixed(2));
   
         // Calculate the net change
-        const netChange = newEffect - oldEffect;
+        const netChange = parseFloat((newEffect - oldEffect).toFixed(2));
   
         const oldAccount = accounts.find(a => a.id === editingTransaction.accountId);
         const newAccount = accounts.find(a => a.id === transactionData.accountId);
@@ -367,7 +367,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
         // Update account balances
         if (oldAccount.id === newAccount.id) {
           // Same account - just apply the net change
-          const updatedBalance = oldAccount.balance + netChange;
+          const updatedBalance = parseFloat((oldAccount.balance + netChange).toFixed(2));
           await dbService.updateAccount(user.uid, oldAccount.id, { balance: updatedBalance });
           
           setAccounts(accounts.map(a => 
@@ -375,8 +375,8 @@ export default function FinanceTrackerApp({ user, onLogout }) {
           ));
         } else {
           // Different accounts - revert old and apply new
-          const oldAccountNewBalance = oldAccount.balance - oldEffect;
-          const newAccountNewBalance = newAccount.balance + newEffect;
+          const oldAccountNewBalance = parseFloat((oldAccount.balance - oldEffect).toFixed(2));
+          const newAccountNewBalance = parseFloat((newAccount.balance + newEffect).toFixed(2));
           
           await dbService.updateAccount(user.uid, oldAccount.id, { balance: oldAccountNewBalance });
           await dbService.updateAccount(user.uid, newAccount.id, { balance: newAccountNewBalance });
@@ -406,10 +406,10 @@ export default function FinanceTrackerApp({ user, onLogout }) {
         
         // Update account balance
         const balanceChange = transactionData.type === "income"
-          ? transactionData.amount
-          : -transactionData.amount;
+          ? parseFloat(transactionData.amount.toFixed(2))
+          : -parseFloat(transactionData.amount.toFixed(2));
         
-        const newBalance = account.balance + balanceChange;
+        const newBalance = parseFloat((account.balance + balanceChange).toFixed(2));
         
         await dbService.updateAccount(user.uid, account.id, { balance: newBalance });
   
@@ -440,9 +440,16 @@ export default function FinanceTrackerApp({ user, onLogout }) {
       const accountBalanceChanges = {};
       
       for (const transactionData of transactionsArray) {
+        // Ensure exact decimal precision
+        const exactAmount = parseFloat(parseFloat(transactionData.amount).toFixed(2));
+        const transactionWithExactAmount = {
+          ...transactionData,
+          amount: exactAmount
+        };
+        
         const newTransaction = await dbService.addTransaction(
           user.uid,
-          transactionData
+          transactionWithExactAmount
         );
         addedTransactions.push(newTransaction);
   
@@ -452,10 +459,12 @@ export default function FinanceTrackerApp({ user, onLogout }) {
         }
         
         const change = transactionData.type === "income" 
-          ? transactionData.amount 
-          : -transactionData.amount;
+          ? exactAmount
+          : -exactAmount;
         
-        accountBalanceChanges[transactionData.accountId] += change;
+        accountBalanceChanges[transactionData.accountId] = parseFloat(
+          (accountBalanceChanges[transactionData.accountId] + change).toFixed(2)
+        );
       }
   
       // Update all affected account balances
@@ -463,7 +472,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
       for (const [accountId, change] of Object.entries(accountBalanceChanges)) {
         const account = updatedAccounts.find(a => a.id === accountId);
         if (account) {
-          const newBalance = account.balance + change;
+          const newBalance = parseFloat((account.balance + change).toFixed(2));
           await dbService.updateAccount(user.uid, accountId, { balance: newBalance });
           account.balance = newBalance;
         }
