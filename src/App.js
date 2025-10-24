@@ -534,7 +534,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
       !categoryFormData.icon
     )
       return;
-
+  
     try {
       if (editingCategory) {
         await dbService.updateCategory(
@@ -557,7 +557,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
         });
         setCategories([...categories, newCategory]);
       }
-
+  
       setCategoryFormData({
         name: "",
         icon: "",
@@ -579,24 +579,46 @@ export default function FinanceTrackerApp({ user, onLogout }) {
       !subcategoryFormData.icon
     )
       return;
-
+  
     try {
+      const parentCat = categories.find((c) => c.id === selectedCategoryId);
+      
       if (editingSubcategory) {
+        // Update existing subcategory
         await dbService.updateCategory(
           user.uid,
           editingSubcategory.id,
           subcategoryFormData
         );
+        
+        // Recalculate parent budget
+        const allSubcategories = categories
+          .filter((c) => c.parentId === selectedCategoryId)
+          .map((c) => c.id === editingSubcategory.id ? { ...c, budget: subcategoryFormData.budget } : c);
+        
+        const newParentBudget = allSubcategories.reduce((sum, sub) => sum + sub.budget, 0);
+        
+        // Update parent category budget
+        await dbService.updateCategory(user.uid, selectedCategoryId, {
+          budget: newParentBudget,
+        });
+        
+        // Update state
         setCategories(
-          categories.map((c) =>
-            c.id === editingSubcategory.id
-              ? { ...editingSubcategory, ...subcategoryFormData }
-              : c
-          )
+          categories.map((c) => {
+            if (c.id === editingSubcategory.id) {
+              return { ...editingSubcategory, ...subcategoryFormData };
+            }
+            if (c.id === selectedCategoryId) {
+              return { ...c, budget: newParentBudget };
+            }
+            return c;
+          })
         );
+        
         setEditingSubcategory(null);
       } else {
-        const parentCat = categories.find((c) => c.id === selectedCategoryId);
+        // Add new subcategory
         const newSubcategory = await dbService.addCategory(user.uid, {
           name: subcategoryFormData.name,
           icon: subcategoryFormData.icon,
@@ -605,9 +627,27 @@ export default function FinanceTrackerApp({ user, onLogout }) {
           type: parentCat.type,
           parentId: selectedCategoryId,
         });
-        setCategories([...categories, newSubcategory]);
+        
+        // Calculate new parent budget (existing subcategories + new one)
+        const existingSubcategories = categories.filter((c) => c.parentId === selectedCategoryId);
+        const newParentBudget = existingSubcategories.reduce((sum, sub) => sum + sub.budget, 0) + subcategoryFormData.budget;
+        
+        // Update parent category budget
+        await dbService.updateCategory(user.uid, selectedCategoryId, {
+          budget: newParentBudget,
+        });
+        
+        // Update state
+        setCategories([
+          ...categories.map((c) => 
+            c.id === selectedCategoryId 
+              ? { ...c, budget: newParentBudget } 
+              : c
+          ),
+          newSubcategory
+        ]);
       }
-
+  
       setSubcategoryFormData({ name: "", icon: "", budget: 0 });
       setShowSubcategoryForm(false);
     } catch (error) {
@@ -2389,132 +2429,159 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                   </button>
                 </div>
                 <div className="space-y-3">
-                  {categories
-                    .filter((c) => !c.parentId)
-                    .map((cat) => (
-                      <div key={cat.id}>
-                        <div className="flex justify-between items-center p-4 border border-gray-100 rounded-lg hover:border-gray-200">
-                          <div className="flex items-center gap-3">
-                            <span className="text-2xl">{cat.icon}</span>
-                            <div>
-                              <div className="font-medium">{cat.name}</div>
-                              <div className="text-xs text-gray-500">
-                                Budget: ${cat.budget} • {cat.type}
-                              </div>
+                {categories
+                  .filter((c) => !c.parentId)
+                  .map((cat) => (
+                    <div key={cat.id}>
+                      <div className="flex justify-between items-center p-4 border border-gray-100 rounded-lg hover:border-gray-200">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{cat.icon}</span>
+                          <div>
+                            <div className="font-medium">{cat.name}</div>
+                            <div className="text-xs text-gray-500">
+                              Budget: ${cat.budget} • {cat.type}
                             </div>
                           </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => {
-                                setSelectedCategoryId(cat.id);
-                                setShowSubcategoryForm(true);
-                                setEditingSubcategory(null);
-                                setSubcategoryFormData({
-                                  name: "",
-                                  icon: "",
-                                  budget: 0,
-                                });
-                              }}
-                              className="px-3 py-1 bg-blue-50 text-blue-600 rounded text-xs font-medium hover:bg-blue-100"
-                            >
-                              + Subcategory
-                            </button>
-                            <button
-                              onClick={() => {
-                                setEditingCategory(cat);
-                                setCategoryFormData(cat);
-                                setShowCategoryForm(true);
-                              }}
-                              className="p-2 hover:bg-gray-100 rounded"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <button
-                              onClick={async () => {
-                                await dbService.deleteCategory(
-                                  user.uid,
-                                  cat.id
-                                );
-                                const subcatIds = categories
-                                  .filter((c) => c.parentId === cat.id)
-                                  .map((c) => c.id);
-                                for (const id of subcatIds) {
-                                  await dbService.deleteCategory(user.uid, id);
-                                }
-                                setCategories(
-                                  categories.filter(
-                                    (c) =>
-                                      c.id !== cat.id && c.parentId !== cat.id
-                                  )
-                                );
-                              }}
-                              className="p-2 hover:bg-red-100 rounded"
-                            >
-                              <Trash2 size={16} className="text-red-600" />
-                            </button>
-                          </div>
                         </div>
-                        {categories.filter((sc) => sc.parentId === cat.id)
-                          .length > 0 && (
-                          <div className="ml-8 mt-2 space-y-2 mb-3">
-                            {categories
-                              .filter((sc) => sc.parentId === cat.id)
-                              .map((subcat) => (
-                                <div
-                                  key={subcat.id}
-                                  className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xl">
-                                      {subcat.icon}
-                                    </span>
-                                    <div>
-                                      <div className="text-sm font-medium">
-                                        {subcat.name}
-                                      </div>
-                                      <div className="text-xs text-gray-500">
-                                        Budget: ${subcat.budget}
-                                      </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedCategoryId(cat.id);
+                              setShowSubcategoryForm(true);
+                              setEditingSubcategory(null);
+                              setSubcategoryFormData({
+                                name: "",
+                                icon: "",
+                                budget: 0,
+                              });
+                            }}
+                            className="px-3 py-1 bg-blue-50 text-blue-600 rounded text-xs font-medium hover:bg-blue-100"
+                          >
+                            + Subcategory
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingCategory(cat);
+                              setCategoryFormData(cat);
+                              setShowCategoryForm(true);
+                            }}
+                            className="p-2 hover:bg-gray-100 rounded"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!window.confirm(`Delete ${cat.name}?`)) return;
+                              
+                              await dbService.deleteCategory(
+                                user.uid,
+                                cat.id
+                              );
+                              const subcatIds = categories
+                                .filter((c) => c.parentId === cat.id)
+                                .map((c) => c.id);
+                              for (const id of subcatIds) {
+                                await dbService.deleteCategory(user.uid, id);
+                              }
+                              setCategories(
+                                categories.filter(
+                                  (c) =>
+                                    c.id !== cat.id && c.parentId !== cat.id
+                                )
+                              );
+                            }}
+                            className="p-2 hover:bg-red-100 rounded"
+                          >
+                            <Trash2 size={16} className="text-red-600" />
+                          </button>
+                        </div>
+                      </div>
+                      {categories.filter((sc) => sc.parentId === cat.id)
+                        .length > 0 && (
+                        <div className="ml-8 mt-2 space-y-2 mb-3">
+                          {categories
+                            .filter((sc) => sc.parentId === cat.id)
+                            .map((subcat) => (
+                              <div
+                                key={subcat.id}
+                                className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xl">
+                                    {subcat.icon}
+                                  </span>
+                                  <div>
+                                    <div className="text-sm font-medium">
+                                      {subcat.name}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      Budget: ${subcat.budget}
                                     </div>
                                   </div>
-                                  <div className="flex gap-2">
-                                    <button
-                                      onClick={() => {
-                                        setEditingSubcategory(subcat);
-                                        setSubcategoryFormData(subcat);
-                                        setSelectedCategoryId(cat.id);
-                                        setShowSubcategoryForm(true);
-                                      }}
-                                      className="p-2 hover:bg-gray-200 rounded"
-                                    >
-                                      <Edit2 size={16} />
-                                    </button>
-                                    <button
-                                      onClick={async () => {
-                                        await dbService.deleteCategory(
-                                          user.uid,
-                                          subcat.id
-                                        );
-                                        setCategories(
-                                          categories.filter(
-                                            (c) => c.id !== subcat.id
-                                          )
-                                        );
-                                      }}
-                                      className="p-2 hover:bg-red-100 rounded"
-                                    >
-                                      <Trash2
-                                        size={16}
-                                        className="text-red-600"
-                                      />
-                                    </button>
-                                  </div>
                                 </div>
-                              ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setEditingSubcategory(subcat);
+                                      setSubcategoryFormData(subcat);
+                                      setSelectedCategoryId(cat.id);
+                                      setShowSubcategoryForm(true);
+                                    }}
+                                    className="p-2 hover:bg-gray-200 rounded"
+                                  >
+                                    <Edit2 size={16} />
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      if (!window.confirm(`Delete ${subcat.name}?`)) return;
+                                      
+                                      try {
+                                        // Delete the subcategory
+                                        await dbService.deleteCategory(user.uid, subcat.id);
+                                        
+                                        // Recalculate parent budget (all subcategories except the deleted one)
+                                        const remainingSubcategories = categories.filter(
+                                          (c) => c.parentId === cat.id && c.id !== subcat.id
+                                        );
+                                        const newParentBudget = remainingSubcategories.reduce(
+                                          (sum, sub) => sum + sub.budget,
+                                          0
+                                        );
+                                        
+                                        // Update parent category budget
+                                        await dbService.updateCategory(user.uid, cat.id, {
+                                          budget: newParentBudget,
+                                        });
+                                        
+                                        // Update state
+                                        setCategories(
+                                          categories
+                                            .filter((c) => c.id !== subcat.id)
+                                            .map((c) => 
+                                              c.id === cat.id 
+                                                ? { ...c, budget: newParentBudget } 
+                                                : c
+                                            )
+                                        );
+                                      } catch (error) {
+                                        console.error("Error deleting subcategory:", error);
+                                        alert("Error deleting subcategory. Please try again.");
+                                      }
+                                    }}
+                                    className="p-2 hover:bg-red-100 rounded"
+                                  >
+                                    <Trash2
+                                      size={16}
+                                      className="text-red-600"
+                                    />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -3127,19 +3194,33 @@ export default function FinanceTrackerApp({ user, onLogout }) {
 
               <div>
                 <label className="text-sm font-medium">Budget Amount</label>
-                <input
-                  type="number"
-                  value={categoryFormData.budget}
-                  onChange={(e) =>
-                    setCategoryFormData({
-                      ...categoryFormData,
-                      budget: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                  className="w-full px-3 py-2 border rounded-lg mt-1 text-sm"
-                  placeholder="0.00"
-                  step="0.01"
-                />
+                {editingCategory && categories.some((c) => c.parentId === editingCategory.id) ? (
+                  <div>
+                    <input
+                      type="number"
+                      value={categoryFormData.budget}
+                      disabled
+                      className="w-full px-3 py-2 border rounded-lg mt-1 text-sm bg-gray-100 cursor-not-allowed"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      💡 Budget is automatically calculated from subcategories ({categories.filter((c) => c.parentId === editingCategory.id).length} subcategories = ${categoryFormData.budget.toFixed(2)})
+                    </p>
+                  </div>
+                ) : (
+                  <input
+                    type="number"
+                    value={categoryFormData.budget}
+                    onChange={(e) =>
+                      setCategoryFormData({
+                        ...categoryFormData,
+                        budget: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full px-3 py-2 border rounded-lg mt-1 text-sm"
+                    placeholder="0.00"
+                    step="0.01"
+                  />
+                )}
               </div>
 
               <div>
