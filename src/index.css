@@ -10,3 +10,103 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Responsive touch targets */
+@media (max-width: 640px) {
+  button, 
+  [role="button"],
+  .clickable {
+    min-height: 40px;
+    min-width: 40px;
+  }
+}
+
+/* Better scrolling on mobile */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+/* Responsive tables - horizontal scroll on mobile */
+@media (max-width: 768px) {
+  .responsive-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+/* Better touch feedback */
+.tap-highlight-transparent {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Adjust text sizes on mobile */
+@media (max-width: 640px) {
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.25rem; }
+  h3 { font-size: 1.125rem; }
+  .stat-value { font-size: 1.25rem; }
+  .stat-label { font-size: 0.7rem; }
+}
+
+/* Better mobile scrolling for lists */
+.transaction-list {
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Improve tap targets on mobile */
+@media (max-width: 640px) {
+  .mobile-tap-target {
+    padding: 12px 8px;
+    margin: 4px 0;
+  }
+  
+  /* Better modal on mobile */
+  .mobile-modal {
+    margin: 8px;
+    max-height: calc(100vh - 16px);
+  }
+  
+  /* Adjust table cells for mobile */
+  td, th {
+    padding: 8px 6px !important;
+  }
+  
+  /* Smaller text on very small screens */
+  .text-xs-mobile {
+    font-size: 0.7rem;
+  }
+}
+
+/* Safe area for notched phones */
+@supports (padding: max(0px)) {
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+  .safe-top {
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+}
+
+/* Custom scrollbar for better mobile experience */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
