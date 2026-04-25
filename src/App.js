@@ -20,6 +20,7 @@ import * as dbService from "./dbService";
 import { getUserPreferences, updateUserPreferences } from "./dbService";
 import { getTransfers, addTransfer, deleteTransfer } from "./dbService";
 import XlsxUploadModal from "./XlsxUploadModal";
+import AIInsights from "./Aiinsights";
 
 export default function FinanceTrackerApp({ user, onLogout }) {
   const [currentScreen, setCurrentScreen] = useState("home");
@@ -1314,7 +1315,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                           t.category === selectedCategoryId ||
                           categories
                             .filter((sc) => sc.parentId === selectedCategoryId)
-                            .find((sc) => sc.id === t.category)
+                            .find((sc) => sc.id === t.category),
                       )
                       .reduce((sum, t) => sum + t.amount, 0)
                       .toFixed(2)}
@@ -1334,11 +1335,11 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                               t.category === selectedCategoryId ||
                               categories
                                 .filter(
-                                  (sc) => sc.parentId === selectedCategoryId
+                                  (sc) => sc.parentId === selectedCategoryId,
                                 )
-                                .find((sc) => sc.id === t.category)
+                                .find((sc) => sc.id === t.category),
                           )
-                          .reduce((sum, t) => sum + t.amount, 0)
+                          .reduce((sum, t) => sum + t.amount, 0),
                     ).toFixed(2)}
                   </div>
                 </div>
@@ -1356,11 +1357,11 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                       t.category === selectedCategoryId ||
                       categories
                         .filter((sc) => sc.parentId === selectedCategoryId)
-                        .find((sc) => sc.id === t.category)
+                        .find((sc) => sc.id === t.category),
                   )
                   .map((trans) => {
                     const transcat = categories.find(
-                      (c) => c.id === trans.category
+                      (c) => c.id === trans.category,
                     );
                     const acc = accounts.find((a) => a.id === trans.accountId);
                     return (
@@ -1393,7 +1394,9 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                             <Edit2 size={16} />
                           </button>
                           <button
-                            onClick={() => handleDeleteTransactionWithBalance(trans)}
+                            onClick={() =>
+                              handleDeleteTransactionWithBalance(trans)
+                            }
                             className="p-2 hover:bg-red-100 rounded"
                           >
                             <Trash2 size={16} className="text-red-600" />
@@ -1418,7 +1421,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                     >
                       <ChevronLeft size={24} className="text-gray-600" />
                     </button>
-                    
+
                     <div className="text-center flex-1">
                       <h2 className="text-3xl font-bold text-gray-900">
                         {getMonthDisplay()}
@@ -1427,7 +1430,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                         {getMonthTransactions().length} transactions this month
                       </p>
                     </div>
-                    
+
                     <button
                       onClick={handleNextMonth}
                       disabled={isCurrentMonth()}
@@ -1441,7 +1444,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                       <ChevronLeft size={24} className="rotate-180" />
                     </button>
                   </div>
-                  
+
                   {!isCurrentMonth() && (
                     <div className="mt-4 text-center">
                       <button
@@ -1546,50 +1549,52 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                         Recent Transactions
                       </h3>
                       <div className="space-y-3">
-                        {getMonthTransactions().slice(0, 5).map((trans) => {
-                          const cat = categories.find(
-                            (c) => c.id === trans.category
-                          );
-                          const parentCat =
-                            cat &&
-                            categories.find((c) => c.id === cat.parentId);
-                          return (
-                            <div
-                              key={trans.id}
-                              className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50"
-                            >
-                              <div className="flex items-start justify-between mb-2">
-                                <div className="flex items-start gap-3">
-                                  <span className="text-lg">
-                                    {cat ? cat.icon : "💰"}
-                                  </span>
-                                  <div>
-                                    <div className="text-sm font-medium">
-                                      {trans.note || "Transaction"}
-                                    </div>
-                                    <div className="text-xs text-gray-500">
-                                      {cat ? cat.name : "Income"}{" "}
-                                      {parentCat ? `(${parentCat.name})` : ""}
-                                    </div>
-                                    <div className="text-xs text-gray-400">
-                                      {trans.date}
+                        {getMonthTransactions()
+                          .slice(0, 5)
+                          .map((trans) => {
+                            const cat = categories.find(
+                              (c) => c.id === trans.category,
+                            );
+                            const parentCat =
+                              cat &&
+                              categories.find((c) => c.id === cat.parentId);
+                            return (
+                              <div
+                                key={trans.id}
+                                className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50"
+                              >
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex items-start gap-3">
+                                    <span className="text-lg">
+                                      {cat ? cat.icon : "💰"}
+                                    </span>
+                                    <div>
+                                      <div className="text-sm font-medium">
+                                        {trans.note || "Transaction"}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {cat ? cat.name : "Income"}{" "}
+                                        {parentCat ? `(${parentCat.name})` : ""}
+                                      </div>
+                                      <div className="text-xs text-gray-400">
+                                        {trans.date}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                                <div
-                                  className={`text-sm font-semibold ${
-                                    trans.type === "income"
-                                      ? "text-green-600"
-                                      : "text-red-600"
-                                  }`}
-                                >
-                                  {trans.type === "income" ? "+" : "-"}$
-                                  {trans.amount.toFixed(2)}
+                                  <div
+                                    className={`text-sm font-semibold ${
+                                      trans.type === "income"
+                                        ? "text-green-600"
+                                        : "text-red-600"
+                                    }`}
+                                  >
+                                    {trans.type === "income" ? "+" : "-"}$
+                                    {trans.amount.toFixed(2)}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
                       </div>
                     </div>
                   </>
@@ -1617,7 +1622,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                           <div className="text-2xl font-bold">
                             $
                             {(stats.totalIncome - stats.totalExpenses).toFixed(
-                              2
+                              2,
                             )}
                           </div>
                         </div>
@@ -1660,7 +1665,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                                     style={{
                                       width: `${Math.min(
                                         cat.percentage,
-                                        100
+                                        100,
                                       )}%`,
                                     }}
                                   />
@@ -1705,7 +1710,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                                     style={{
                                       width: `${Math.min(
                                         cat.percentage,
-                                        100
+                                        100,
                                       )}%`,
                                     }}
                                   />
@@ -1721,41 +1726,43 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                         Recent Activity
                       </h3>
                       <div className="space-y-2">
-                        {getMonthTransactions().slice(0, 5).map((trans) => {
-                          const cat = categories.find(
-                            (c) => c.id === trans.category
-                          );
-                          return (
-                            <div
-                              key={trans.id}
-                              className="flex items-center justify-between p-2 hover:bg-gray-50 rounded"
-                            >
-                              <div className="flex items-center gap-2">
-                                <span className="text-lg">
-                                  {cat ? cat.icon : "💰"}
-                                </span>
-                                <div>
-                                  <div className="text-sm font-medium">
-                                    {trans.note || cat?.name || "Transaction"}
-                                  </div>
-                                  <div className="text-xs text-gray-500">
-                                    {trans.date}
+                        {getMonthTransactions()
+                          .slice(0, 5)
+                          .map((trans) => {
+                            const cat = categories.find(
+                              (c) => c.id === trans.category,
+                            );
+                            return (
+                              <div
+                                key={trans.id}
+                                className="flex items-center justify-between p-2 hover:bg-gray-50 rounded"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg">
+                                    {cat ? cat.icon : "💰"}
+                                  </span>
+                                  <div>
+                                    <div className="text-sm font-medium">
+                                      {trans.note || cat?.name || "Transaction"}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {trans.date}
+                                    </div>
                                   </div>
                                 </div>
+                                <div
+                                  className={`text-sm font-semibold ${
+                                    trans.type === "income"
+                                      ? "text-green-600"
+                                      : "text-red-600"
+                                  }`}
+                                >
+                                  {trans.type === "income" ? "+" : "-"}$
+                                  {trans.amount.toFixed(2)}
+                                </div>
                               </div>
-                              <div
-                                className={`text-sm font-semibold ${
-                                  trans.type === "income"
-                                    ? "text-green-600"
-                                    : "text-red-600"
-                                }`}
-                              >
-                                {trans.type === "income" ? "+" : "-"}$
-                                {trans.amount.toFixed(2)}
-                              </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
                       </div>
                     </div>
                   </>
@@ -1837,41 +1844,45 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                           Recent Transactions
                         </h3>
                         <div className="space-y-2">
-                          {getMonthTransactions().slice(0, 6).map((trans) => {
-                            const cat = categories.find(
-                              (c) => c.id === trans.category
-                            );
-                            return (
-                              <div
-                                key={trans.id}
-                                className="flex items-center justify-between p-2 hover:bg-gray-50 rounded"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="text-base">
-                                    {cat ? cat.icon : "💰"}
-                                  </span>
-                                  <div>
-                                    <div className="text-xs font-medium">
-                                      {trans.note || cat?.name || "Transaction"}
-                                    </div>
-                                    <div className="text-xs text-gray-400">
-                                      {trans.date}
+                          {getMonthTransactions()
+                            .slice(0, 6)
+                            .map((trans) => {
+                              const cat = categories.find(
+                                (c) => c.id === trans.category,
+                              );
+                              return (
+                                <div
+                                  key={trans.id}
+                                  className="flex items-center justify-between p-2 hover:bg-gray-50 rounded"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-base">
+                                      {cat ? cat.icon : "💰"}
+                                    </span>
+                                    <div>
+                                      <div className="text-xs font-medium">
+                                        {trans.note ||
+                                          cat?.name ||
+                                          "Transaction"}
+                                      </div>
+                                      <div className="text-xs text-gray-400">
+                                        {trans.date}
+                                      </div>
                                     </div>
                                   </div>
+                                  <div
+                                    className={`text-xs font-semibold ${
+                                      trans.type === "income"
+                                        ? "text-green-600"
+                                        : "text-red-600"
+                                    }`}
+                                  >
+                                    {trans.type === "income" ? "+" : "-"}$
+                                    {trans.amount.toFixed(2)}
+                                  </div>
                                 </div>
-                                <div
-                                  className={`text-xs font-semibold ${
-                                    trans.type === "income"
-                                      ? "text-green-600"
-                                      : "text-red-600"
-                                  }`}
-                                >
-                                  {trans.type === "income" ? "+" : "-"}$
-                                  {trans.amount.toFixed(2)}
-                                </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
                         </div>
                       </div>
                     </div>
@@ -1918,7 +1929,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                           >
                             $
                             {(stats.totalIncome - stats.totalExpenses).toFixed(
-                              2
+                              2,
                             )}
                           </div>
                           <div className="text-xs text-gray-400">
@@ -1973,8 +1984,8 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                                       isOverBudget
                                         ? "text-red-600"
                                         : isNearLimit
-                                        ? "text-orange-600"
-                                        : "text-gray-900"
+                                          ? "text-orange-600"
+                                          : "text-gray-900"
                                     }`}
                                   >
                                     ${cat.spent.toFixed(2)}
@@ -1984,8 +1995,8 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                                       isOverBudget
                                         ? "text-red-600"
                                         : isNearLimit
-                                        ? "text-orange-600"
-                                        : "text-green-600"
+                                          ? "text-orange-600"
+                                          : "text-green-600"
                                     }`}
                                   >
                                     {cat.percentage.toFixed(0)}% used
@@ -2000,8 +2011,8 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                                     backgroundColor: isOverBudget
                                       ? "#EF4444"
                                       : isNearLimit
-                                      ? "#F97316"
-                                      : cat.color,
+                                        ? "#F97316"
+                                        : cat.color,
                                   }}
                                 />
                               </div>
@@ -2063,17 +2074,24 @@ export default function FinanceTrackerApp({ user, onLogout }) {
 
                 {/* Filters Card */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                  <h3 className="text-lg font-semibold mb-4 text-gray-800">Filter Transactions</h3>
-                  
+                  <h3 className="text-lg font-semibold mb-4 text-gray-800">
+                    Filter Transactions
+                  </h3>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* Date From */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        From Date
+                      </label>
                       <input
                         type="date"
                         value={transactionFilters.dateFrom}
                         onChange={(e) =>
-                          setTransactionFilters({ ...transactionFilters, dateFrom: e.target.value })
+                          setTransactionFilters({
+                            ...transactionFilters,
+                            dateFrom: e.target.value,
+                          })
                         }
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                       />
@@ -2081,12 +2099,17 @@ export default function FinanceTrackerApp({ user, onLogout }) {
 
                     {/* Date To */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        To Date
+                      </label>
                       <input
                         type="date"
                         value={transactionFilters.dateTo}
                         onChange={(e) =>
-                          setTransactionFilters({ ...transactionFilters, dateTo: e.target.value })
+                          setTransactionFilters({
+                            ...transactionFilters,
+                            dateTo: e.target.value,
+                          })
                         }
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                       />
@@ -2094,11 +2117,16 @@ export default function FinanceTrackerApp({ user, onLogout }) {
 
                     {/* Transaction Type */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Type
+                      </label>
                       <select
                         value={transactionFilters.type}
                         onChange={(e) =>
-                          setTransactionFilters({ ...transactionFilters, type: e.target.value })
+                          setTransactionFilters({
+                            ...transactionFilters,
+                            type: e.target.value,
+                          })
                         }
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                       >
@@ -2111,11 +2139,16 @@ export default function FinanceTrackerApp({ user, onLogout }) {
 
                     {/* Category Type (Need/Want) */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Category Type</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Category Type
+                      </label>
                       <select
                         value={transactionFilters.categoryType}
                         onChange={(e) =>
-                          setTransactionFilters({ ...transactionFilters, categoryType: e.target.value })
+                          setTransactionFilters({
+                            ...transactionFilters,
+                            categoryType: e.target.value,
+                          })
                         }
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                       >
@@ -2127,11 +2160,16 @@ export default function FinanceTrackerApp({ user, onLogout }) {
 
                     {/* Category */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Category
+                      </label>
                       <select
                         value={transactionFilters.category}
                         onChange={(e) =>
-                          setTransactionFilters({ ...transactionFilters, category: e.target.value })
+                          setTransactionFilters({
+                            ...transactionFilters,
+                            category: e.target.value,
+                          })
                         }
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                       >
@@ -2148,12 +2186,17 @@ export default function FinanceTrackerApp({ user, onLogout }) {
 
                     {/* Min Amount */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Min Amount</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Min Amount
+                      </label>
                       <input
                         type="number"
                         value={transactionFilters.minAmount}
                         onChange={(e) =>
-                          setTransactionFilters({ ...transactionFilters, minAmount: e.target.value })
+                          setTransactionFilters({
+                            ...transactionFilters,
+                            minAmount: e.target.value,
+                          })
                         }
                         placeholder="0.00"
                         step="0.01"
@@ -2163,12 +2206,17 @@ export default function FinanceTrackerApp({ user, onLogout }) {
 
                     {/* Max Amount */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Max Amount</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Max Amount
+                      </label>
                       <input
                         type="number"
                         value={transactionFilters.maxAmount}
                         onChange={(e) =>
-                          setTransactionFilters({ ...transactionFilters, maxAmount: e.target.value })
+                          setTransactionFilters({
+                            ...transactionFilters,
+                            maxAmount: e.target.value,
+                          })
                         }
                         placeholder="9999.99"
                         step="0.01"
@@ -2178,12 +2226,17 @@ export default function FinanceTrackerApp({ user, onLogout }) {
 
                     {/* Search Note */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Search
+                      </label>
                       <input
                         type="text"
                         value={transactionFilters.searchNote}
                         onChange={(e) =>
-                          setTransactionFilters({ ...transactionFilters, searchNote: e.target.value })
+                          setTransactionFilters({
+                            ...transactionFilters,
+                            searchNote: e.target.value,
+                          })
                         }
                         placeholder="Search by note or category..."
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
@@ -2192,22 +2245,30 @@ export default function FinanceTrackerApp({ user, onLogout }) {
 
                     {/* Month Filter - ADD THIS */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Month
+                      </label>
                       <div className="flex gap-2">
-                      <select
-                        value={transactionFilters.month}
-                        onChange={(e) =>
-                          setTransactionFilters({ ...transactionFilters, month: e.target.value })
-                        }
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                      >
-                        <option value="">All Time</option>
+                        <select
+                          value={transactionFilters.month}
+                          onChange={(e) =>
+                            setTransactionFilters({
+                              ...transactionFilters,
+                              month: e.target.value,
+                            })
+                          }
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        >
+                          <option value="">All Time</option>
                           {/* Generate last 12 months */}
                           {Array.from({ length: 12 }, (_, i) => {
                             const date = new Date();
                             date.setMonth(date.getMonth() - i);
                             const monthStr = date.toISOString().slice(0, 7);
-                            const display = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                            const display = date.toLocaleDateString("en-US", {
+                              month: "long",
+                              year: "numeric",
+                            });
                             return (
                               <option key={monthStr} value={monthStr}>
                                 {display}
@@ -2218,7 +2279,10 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                         <div className="flex gap-2">
                           <button
                             onClick={() => {
-                              setTransactionFilters({ ...transactionFilters, month: currentMonth });
+                              setTransactionFilters({
+                                ...transactionFilters,
+                                month: currentMonth,
+                              });
                             }}
                             className="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 text-sm font-medium whitespace-nowrap"
                             title="Current Month"
@@ -2227,7 +2291,10 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                           </button>
                           <button
                             onClick={() => {
-                              setTransactionFilters({ ...transactionFilters, month: "" });
+                              setTransactionFilters({
+                                ...transactionFilters,
+                                month: "",
+                              });
                             }}
                             className="px-3 py-2 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 text-sm font-medium whitespace-nowrap"
                             title="All Time"
@@ -2237,7 +2304,6 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                         </div>
                       </div>
                     </div>
-
                   </div>
 
                   {/* Clear Filters Button */}
@@ -2266,10 +2332,19 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                 {/* Results Summary */}
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-4">
                   <p className="text-sm text-gray-700">
-                    Showing <span className="font-semibold text-blue-600">{getFilteredTransactions().length}</span> of{" "}
-                    <span className="font-semibold text-gray-600">{transactions.length}</span> transactions
+                    Showing{" "}
+                    <span className="font-semibold text-blue-600">
+                      {getFilteredTransactions().length}
+                    </span>{" "}
+                    of{" "}
+                    <span className="font-semibold text-gray-600">
+                      {transactions.length}
+                    </span>{" "}
+                    transactions
                     {Object.values(transactionFilters).some((v) => v) && (
-                      <span className="text-gray-500 ml-2">(filters applied)</span>
+                      <span className="text-gray-500 ml-2">
+                        (filters applied)
+                      </span>
                     )}
                   </p>
                 </div>
@@ -2279,8 +2354,12 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                   {getFilteredTransactions().length > 0 ? (
                     <div className="divide-y divide-gray-100">
                       {getFilteredTransactions().map((trans) => {
-                        const cat = categories.find((c) => c.id === trans.category);
-                        const acc = accounts.find((a) => a.id === trans.accountId);
+                        const cat = categories.find(
+                          (c) => c.id === trans.category,
+                        );
+                        const acc = accounts.find(
+                          (a) => a.id === trans.accountId,
+                        );
                         return (
                           <div
                             key={trans.id}
@@ -2337,14 +2416,22 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                                     className="p-2 hover:bg-blue-100 rounded-lg transition-colors"
                                     title="Edit"
                                   >
-                                    <Edit2 size={16} className="text-blue-600" />
+                                    <Edit2
+                                      size={16}
+                                      className="text-blue-600"
+                                    />
                                   </button>
                                   <button
-                                    onClick={() => handleDeleteTransactionWithBalance(trans)}
+                                    onClick={() =>
+                                      handleDeleteTransactionWithBalance(trans)
+                                    }
                                     className="p-2 hover:bg-red-100 rounded-lg transition-colors"
                                     title="Delete"
                                   >
-                                    <Trash2 size={16} className="text-red-600" />
+                                    <Trash2
+                                      size={16}
+                                      className="text-red-600"
+                                    />
                                   </button>
                                 </div>
                               </div>
@@ -2356,16 +2443,18 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                   ) : (
                     <div className="p-12 text-center">
                       <div className="text-gray-400 text-5xl mb-3">📋</div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-1">No transactions found</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                        No transactions found
+                      </h3>
                       <p className="text-sm text-gray-500">
-                        Try adjusting your filters or import transactions to get started.
+                        Try adjusting your filters or import transactions to get
+                        started.
                       </p>
                     </div>
                   )}
                 </div>
               </div>
             )}
-
 
             {currentScreen === "categories" && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -2433,7 +2522,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                               onClick={async () => {
                                 await dbService.deleteCategory(
                                   user.uid,
-                                  cat.id
+                                  cat.id,
                                 );
                                 const subcatIds = categories
                                   .filter((c) => c.parentId === cat.id)
@@ -2444,8 +2533,8 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                                 setCategories(
                                   categories.filter(
                                     (c) =>
-                                      c.id !== cat.id && c.parentId !== cat.id
-                                  )
+                                      c.id !== cat.id && c.parentId !== cat.id,
+                                  ),
                                 );
                               }}
                               className="p-2 hover:bg-red-100 rounded"
@@ -2493,12 +2582,12 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                                       onClick={async () => {
                                         await dbService.deleteCategory(
                                           user.uid,
-                                          subcat.id
+                                          subcat.id,
                                         );
                                         setCategories(
                                           categories.filter(
-                                            (c) => c.id !== subcat.id
-                                          )
+                                            (c) => c.id !== subcat.id,
+                                          ),
                                         );
                                       }}
                                       className="p-2 hover:bg-red-100 rounded"
@@ -2521,10 +2610,12 @@ export default function FinanceTrackerApp({ user, onLogout }) {
 
             {currentScreen === "accounts" && (
               <div className="space-y-6">
-                {viewingAccountDetail && selectedAccountId && accounts.find(a => a.id === selectedAccountId) ? (
+                {viewingAccountDetail &&
+                selectedAccountId &&
+                accounts.find((a) => a.id === selectedAccountId) ? (
                   /* Account Detail View */
-                  <AccountDetailView 
-                    account={accounts.find(a => a.id === selectedAccountId)}
+                  <AccountDetailView
+                    account={accounts.find((a) => a.id === selectedAccountId)}
                     setViewingAccountDetail={setViewingAccountDetail}
                     setSelectedAccountId={setSelectedAccountId}
                   />
@@ -2537,7 +2628,10 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                         <div>
                           <h2 className="text-xl font-bold">Bank Accounts</h2>
                           <p className="text-sm text-gray-500 mt-1">
-                            Total Balance: <span className="font-semibold text-gray-900">${stats.totalAccountBalance.toFixed(2)}</span>
+                            Total Balance:{" "}
+                            <span className="font-semibold text-gray-900">
+                              ${stats.totalAccountBalance.toFixed(2)}
+                            </span>
                           </p>
                         </div>
                         <div className="flex gap-3">
@@ -2554,9 +2648,15 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                             }}
                             disabled={accounts.length < 2}
                             className={`bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:shadow-lg transition-all ${
-                              accounts.length < 2 ? "opacity-50 cursor-not-allowed" : ""
+                              accounts.length < 2
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
                             }`}
-                            title={accounts.length < 2 ? "Need at least 2 accounts to transfer" : "Transfer money between accounts"}
+                            title={
+                              accounts.length < 2
+                                ? "Need at least 2 accounts to transfer"
+                                : "Transfer money between accounts"
+                            }
                           >
                             <ArrowRight size={18} />
                             Transfer Money
@@ -2584,18 +2684,28 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                       <div className="flex justify-between items-center mb-6">
                         <div>
-                          <h3 className="text-lg font-semibold text-gray-800">Your Accounts</h3>
-                          <p className="text-sm text-gray-500 mt-1">{accounts.length} account{accounts.length !== 1 ? "s" : ""} total</p>
+                          <h3 className="text-lg font-semibold text-gray-800">
+                            Your Accounts
+                          </h3>
+                          <p className="text-sm text-gray-500 mt-1">
+                            {accounts.length} account
+                            {accounts.length !== 1 ? "s" : ""} total
+                          </p>
                         </div>
                       </div>
                       <div className="space-y-3">
                         {accounts.map((acc) => {
-                          const accountTransactions = getMonthTransactions().filter(t => t.accountId === acc.id);
-                          const accountTransfers = transfers.filter(t => 
-                            (t.fromAccountId === acc.id || t.toAccountId === acc.id) &&
-                            t.date.startsWith(currentMonth)
+                          const accountTransactions =
+                            getMonthTransactions().filter(
+                              (t) => t.accountId === acc.id,
+                            );
+                          const accountTransfers = transfers.filter(
+                            (t) =>
+                              (t.fromAccountId === acc.id ||
+                                t.toAccountId === acc.id) &&
+                              t.date.startsWith(currentMonth),
                           );
-                          
+
                           return (
                             <div
                               key={acc.id}
@@ -2618,12 +2728,16 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                                     <Wallet size={24} className="text-white" />
                                   </div>
                                   <div>
-                                    <div className="font-semibold text-gray-900">{acc.name}</div>
+                                    <div className="font-semibold text-gray-900">
+                                      {acc.name}
+                                    </div>
                                     <div className="text-xs text-gray-500 capitalize flex items-center gap-2">
                                       {acc.type}
                                       <span className="text-gray-400">•</span>
                                       <span className="text-gray-600">
-                                        {accountTransactions.length} transactions • {accountTransfers.length} transfers this month
+                                        {accountTransactions.length}{" "}
+                                        transactions • {accountTransfers.length}{" "}
+                                        transfers this month
                                       </span>
                                     </div>
                                   </div>
@@ -2652,26 +2766,44 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                                     <button
                                       onClick={async (e) => {
                                         e.stopPropagation();
-                                        const hasTransactions = transactions.some(
-                                          t => t.accountId === acc.id
-                                        );
+                                        const hasTransactions =
+                                          transactions.some(
+                                            (t) => t.accountId === acc.id,
+                                          );
                                         const hasTransfers = transfers.some(
-                                          t => t.fromAccountId === acc.id || t.toAccountId === acc.id
+                                          (t) =>
+                                            t.fromAccountId === acc.id ||
+                                            t.toAccountId === acc.id,
                                         );
-                                        
+
                                         if (hasTransactions || hasTransfers) {
-                                          alert("Cannot delete account with transactions or transfers. Please delete or move all transactions first.");
+                                          alert(
+                                            "Cannot delete account with transactions or transfers. Please delete or move all transactions first.",
+                                          );
                                           return;
                                         }
-                                        
-                                        if (!customConfirm(`Delete ${acc.name}?`)) return;
-                                        
-                                        await dbService.deleteAccount(user.uid, acc.id);
-                                        setAccounts(accounts.filter((a) => a.id !== acc.id));
+
+                                        if (
+                                          !customConfirm(`Delete ${acc.name}?`)
+                                        )
+                                          return;
+
+                                        await dbService.deleteAccount(
+                                          user.uid,
+                                          acc.id,
+                                        );
+                                        setAccounts(
+                                          accounts.filter(
+                                            (a) => a.id !== acc.id,
+                                          ),
+                                        );
                                       }}
                                       className="p-2 hover:bg-red-100 rounded-lg transition-colors"
                                     >
-                                      <Trash2 size={16} className="text-red-600" />
+                                      <Trash2
+                                        size={16}
+                                        className="text-red-600"
+                                      />
                                     </button>
                                   </div>
                                 </div>
@@ -2686,13 +2818,21 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                     {transfers.length > 0 && (
                       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                         <div className="p-6 border-b border-gray-100">
-                          <h3 className="text-lg font-semibold text-gray-800">Transfer History</h3>
-                          <p className="text-sm text-gray-500 mt-1">Recent money transfers between accounts</p>
+                          <h3 className="text-lg font-semibold text-gray-800">
+                            Transfer History
+                          </h3>
+                          <p className="text-sm text-gray-500 mt-1">
+                            Recent money transfers between accounts
+                          </p>
                         </div>
                         <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
                           {transfers.slice(0, 20).map((transfer) => {
-                            const fromAcc = accounts.find(a => a.id === transfer.fromAccountId);
-                            const toAcc = accounts.find(a => a.id === transfer.toAccountId);
+                            const fromAcc = accounts.find(
+                              (a) => a.id === transfer.fromAccountId,
+                            );
+                            const toAcc = accounts.find(
+                              (a) => a.id === transfer.toAccountId,
+                            );
                             return (
                               <div
                                 key={transfer.id}
@@ -2701,25 +2841,33 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                                 <div className="flex justify-between items-center">
                                   <div className="flex items-center gap-3 flex-1 min-w-0">
                                     <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl flex items-center justify-center shadow-sm">
-                                      <ArrowRight size={24} className="text-white" />
+                                      <ArrowRight
+                                        size={24}
+                                        className="text-white"
+                                      />
                                     </div>
                                     <div className="min-w-0 flex-1">
                                       <div className="font-semibold text-gray-900 mb-1 flex items-center gap-2 flex-wrap">
-                                        <span 
+                                        <span
                                           className="px-2 py-0.5 rounded text-xs font-medium truncate"
-                                          style={{ 
-                                            backgroundColor: fromAcc?.color + "20", 
-                                            color: fromAcc?.color 
+                                          style={{
+                                            backgroundColor:
+                                              fromAcc?.color + "20",
+                                            color: fromAcc?.color,
                                           }}
                                         >
                                           {fromAcc?.name || "Unknown"}
                                         </span>
-                                        <ArrowRight size={14} className="text-gray-400 flex-shrink-0" />
-                                        <span 
+                                        <ArrowRight
+                                          size={14}
+                                          className="text-gray-400 flex-shrink-0"
+                                        />
+                                        <span
                                           className="px-2 py-0.5 rounded text-xs font-medium truncate"
-                                          style={{ 
-                                            backgroundColor: toAcc?.color + "20", 
-                                            color: toAcc?.color 
+                                          style={{
+                                            backgroundColor:
+                                              toAcc?.color + "20",
+                                            color: toAcc?.color,
                                           }}
                                         >
                                           {toAcc?.name || "Unknown"}
@@ -2729,10 +2877,12 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                                         {transfer.note}
                                       </div>
                                       <div className="text-xs text-gray-500 mt-1">
-                                        {new Date(transfer.date).toLocaleDateString('en-US', { 
-                                          month: 'short', 
-                                          day: 'numeric', 
-                                          year: 'numeric' 
+                                        {new Date(
+                                          transfer.date,
+                                        ).toLocaleDateString("en-US", {
+                                          month: "short",
+                                          day: "numeric",
+                                          year: "numeric",
                                         })}
                                       </div>
                                     </div>
@@ -2744,11 +2894,16 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                                       </div>
                                     </div>
                                     <button
-                                      onClick={() => handleDeleteTransfer(transfer)}
+                                      onClick={() =>
+                                        handleDeleteTransfer(transfer)
+                                      }
                                       className="p-2 hover:bg-red-100 rounded-lg transition-colors group"
                                       title="Reverse Transfer"
                                     >
-                                      <Trash2 size={16} className="text-red-600 group-hover:scale-110 transition-transform" />
+                                      <Trash2
+                                        size={16}
+                                        className="text-red-600 group-hover:scale-110 transition-transform"
+                                      />
                                     </button>
                                   </div>
                                 </div>
@@ -2761,6 +2916,15 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                   </>
                 )}
               </div>
+            )}
+
+            {currentScreen === "ai" && (
+              <AIInsights
+                transactions={transactions}
+                categories={categories}
+                accounts={accounts}
+                stats={stats}
+              />
             )}
 
             {currentScreen === "budget" && (
@@ -2835,7 +2999,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
       </button>
 
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
-        <div className="max-w-6xl mx-auto grid grid-cols-5 px-4 py-3">
+        <div className="max-w-6xl mx-auto grid grid-cols-6 px-4 py-3">
           <button
             onClick={() => setCurrentScreen("home")}
             className={`flex flex-col items-center gap-1 ${
@@ -2882,6 +3046,15 @@ export default function FinanceTrackerApp({ user, onLogout }) {
           >
             <BarChart3 size={20} />
             <span className="text-xs">Budget</span>
+          </button>
+          <button
+            onClick={() => setCurrentScreen("ai")}
+            className={`flex flex-col items-center gap-1 ${
+              currentScreen === "ai" ? "text-blue-600" : "text-gray-400"
+            }`}
+          >
+            <span style={{ fontSize: 20 }}>✦</span>
+            <span className="text-xs">AI</span>
           </button>
         </div>
       </div>
@@ -2947,7 +3120,7 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                     <select
                       value={(() => {
                         const selectedCat = categories.find(
-                          (c) => c.id === formData.category
+                          (c) => c.id === formData.category,
                         );
                         if (selectedCat && selectedCat.parentId) {
                           return selectedCat.parentId;
@@ -2975,12 +3148,12 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                   {formData.category &&
                     (() => {
                       const selectedCat = categories.find(
-                        (c) => c.id === formData.category
+                        (c) => c.id === formData.category,
                       );
                       const mainCatId =
                         selectedCat?.parentId || formData.category;
                       const subcats = categories.filter(
-                        (sc) => sc.parentId === mainCatId
+                        (sc) => sc.parentId === mainCatId,
                       );
 
                       return subcats.length > 0 ? (
@@ -3577,8 +3750,8 @@ export default function FinanceTrackerApp({ user, onLogout }) {
       {showPdfUploadModal && (
         <XlsxUploadModal
           onClose={() => setShowPdfUploadModal(false)}
-          categories={categories} 
-          accounts={accounts}     
+          categories={categories}
+          accounts={accounts}
           onBulkAdd={handleBulkAddTransactions}
         />
       )}
@@ -3587,7 +3760,9 @@ export default function FinanceTrackerApp({ user, onLogout }) {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white">
-              <h2 className="text-2xl font-bold text-gray-900">How to Import Transactions</h2>
+              <h2 className="text-2xl font-bold text-gray-900">
+                How to Import Transactions
+              </h2>
               <button
                 onClick={() => setShowImportHelp(false)}
                 className="text-gray-400 hover:text-gray-600 p-1"
@@ -3608,12 +3783,22 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                       Import XLSX
                     </h3>
                     <p className="text-sm text-gray-600 mb-2">
-                      Upload an Excel file directly with your bank transactions. Perfect if you already have your data in spreadsheet format.
+                      Upload an Excel file directly with your bank transactions.
+                      Perfect if you already have your data in spreadsheet
+                      format.
                     </p>
                     <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-gray-700 space-y-1">
-                      <p><strong>Required columns:</strong> Date, Type, Description, Amount</p>
-                      <p><strong>Format:</strong> .xlsx files only</p>
-                      <p><strong>Auto-categorization:</strong> Transactions are automatically categorized based on merchant names</p>
+                      <p>
+                        <strong>Required columns:</strong> Date, Type,
+                        Description, Amount
+                      </p>
+                      <p>
+                        <strong>Format:</strong> .xlsx files only
+                      </p>
+                      <p>
+                        <strong>Auto-categorization:</strong> Transactions are
+                        automatically categorized based on merchant names
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -3633,12 +3818,20 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                       Convert Statement to XLSX
                     </h3>
                     <p className="text-sm text-gray-600 mb-2">
-                      Have a PDF bank statement? Use our converter tool to extract and convert it to an Excel file.
+                      Have a PDF bank statement? Use our converter tool to
+                      extract and convert it to an Excel file.
                     </p>
                     <div className="bg-purple-50 border border-purple-200 rounded p-3 text-xs text-gray-700 space-y-1">
-                      <p><strong>Supported formats:</strong> Bank statement PDFs</p>
-                      <p><strong>Service:</strong> Powered by Statement Parser</p>
-                      <p><strong>Next step:</strong> Download the generated XLSX and import it using the "Import XLSX" button</p>
+                      <p>
+                        <strong>Supported formats:</strong> Bank statement PDFs
+                      </p>
+                      <p>
+                        <strong>Service:</strong> Powered by Statement Parser
+                      </p>
+                      <p>
+                        <strong>Next step:</strong> Download the generated XLSX
+                        and import it using the "Import XLSX" button
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -3646,9 +3839,14 @@ export default function FinanceTrackerApp({ user, onLogout }) {
 
               {/* Workflow */}
               <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                <h4 className="font-semibold text-gray-900 text-sm">Typical Workflow:</h4>
+                <h4 className="font-semibold text-gray-900 text-sm">
+                  Typical Workflow:
+                </h4>
                 <div className="text-xs text-gray-700 space-y-1">
-                  <p>1. Have a PDF bank statement? → Click "Convert Statement to XLSX"</p>
+                  <p>
+                    1. Have a PDF bank statement? → Click "Convert Statement to
+                    XLSX"
+                  </p>
                   <p>2. Download the converted Excel file</p>
                   <p>3. Return here and click "Import XLSX"</p>
                   <p>4. Review and verify all transactions</p>
@@ -3658,11 +3856,17 @@ export default function FinanceTrackerApp({ user, onLogout }) {
 
               {/* Tips */}
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-2">
-                <h4 className="font-semibold text-green-900 text-sm">💡 Tips:</h4>
+                <h4 className="font-semibold text-green-900 text-sm">
+                  💡 Tips:
+                </h4>
                 <ul className="text-xs text-green-800 space-y-1">
-                  <li>• Review all highlighted (red) transactions before importing</li>
+                  <li>
+                    • Review all highlighted (red) transactions before importing
+                  </li>
                   <li>• You can edit, categorize, or delete any transaction</li>
-                  <li>• Categories are auto-suggested based on merchant names</li>
+                  <li>
+                    • Categories are auto-suggested based on merchant names
+                  </li>
                   <li>• All transactions marked as "ready" will be imported</li>
                 </ul>
               </div>
@@ -3698,7 +3902,10 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                 <select
                   value={transferFormData.fromAccountId}
                   onChange={(e) =>
-                    setTransferFormData({ ...transferFormData, fromAccountId: e.target.value })
+                    setTransferFormData({
+                      ...transferFormData,
+                      fromAccountId: e.target.value,
+                    })
                   }
                   className="w-full px-3 py-2 border rounded-lg mt-1 text-sm"
                 >
@@ -3713,7 +3920,10 @@ export default function FinanceTrackerApp({ user, onLogout }) {
 
               <div className="flex justify-center">
                 <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
-                  <ArrowRight size={20} className="text-white transform rotate-90" />
+                  <ArrowRight
+                    size={20}
+                    className="text-white transform rotate-90"
+                  />
                 </div>
               </div>
 
@@ -3722,7 +3932,10 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                 <select
                   value={transferFormData.toAccountId}
                   onChange={(e) =>
-                    setTransferFormData({ ...transferFormData, toAccountId: e.target.value })
+                    setTransferFormData({
+                      ...transferFormData,
+                      toAccountId: e.target.value,
+                    })
                   }
                   className="w-full px-3 py-2 border rounded-lg mt-1 text-sm"
                 >
@@ -3741,7 +3954,10 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                   type="number"
                   value={transferFormData.amount}
                   onChange={(e) =>
-                    setTransferFormData({ ...transferFormData, amount: e.target.value })
+                    setTransferFormData({
+                      ...transferFormData,
+                      amount: e.target.value,
+                    })
                   }
                   className="w-full px-3 py-2 border rounded-lg mt-1 text-sm"
                   placeholder="0.00"
@@ -3755,7 +3971,10 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                   type="date"
                   value={transferFormData.date}
                   onChange={(e) =>
-                    setTransferFormData({ ...transferFormData, date: e.target.value })
+                    setTransferFormData({
+                      ...transferFormData,
+                      date: e.target.value,
+                    })
                   }
                   className="w-full px-3 py-2 border rounded-lg mt-1 text-sm"
                 />
@@ -3767,7 +3986,10 @@ export default function FinanceTrackerApp({ user, onLogout }) {
                   type="text"
                   value={transferFormData.note}
                   onChange={(e) =>
-                    setTransferFormData({ ...transferFormData, note: e.target.value })
+                    setTransferFormData({
+                      ...transferFormData,
+                      note: e.target.value,
+                    })
                   }
                   className="w-full px-3 py-2 border rounded-lg mt-1 text-sm"
                   placeholder="e.g., Monthly savings"

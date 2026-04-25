@@ -1,0 +1,67 @@
+[debug] [2026-02-21T08:42:58.980Z] ----------------------------------------------------------------------
+[debug] [2026-02-21T08:42:58.982Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\menuk\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only functions --debug
+[debug] [2026-02-21T08:42:58.982Z] CLI Version:   15.7.0
+[debug] [2026-02-21T08:42:58.982Z] Platform:      win32
+[debug] [2026-02-21T08:42:58.982Z] Node Version:  v20.17.0
+[debug] [2026-02-21T08:42:58.982Z] Time:          Sat Feb 21 2026 03:42:58 GMT-0500 (Eastern Standard Time)
+[debug] [2026-02-21T08:42:58.982Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-02-21T08:43:00.146Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-02-21T08:43:00.147Z] > authorizing via signed-in user (menukapinto5555@gmail.com)
+[debug] [2026-02-21T08:43:00.147Z] [iam] checking project financetrackerapp-75842 for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2026-02-21T08:43:00.148Z] Checked if tokens are valid: true, expires at: 1771665240210
+[debug] [2026-02-21T08:43:00.148Z] Checked if tokens are valid: true, expires at: 1771665240210
+[debug] [2026-02-21T08:43:00.149Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/financetrackerapp-75842:testIamPermissions [none]
+[debug] [2026-02-21T08:43:00.150Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/financetrackerapp-75842:testIamPermissions  x-goog-user-project=financetrackerapp-75842
+[debug] [2026-02-21T08:43:00.150Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/financetrackerapp-75842:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2026-02-21T08:43:00.332Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/financetrackerapp-75842:testIamPermissions 200
+[debug] [2026-02-21T08:43:00.333Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/financetrackerapp-75842:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2026-02-21T08:43:00.333Z] Checked if tokens are valid: true, expires at: 1771665240210
+[debug] [2026-02-21T08:43:00.333Z] Checked if tokens are valid: true, expires at: 1771665240210
+[debug] [2026-02-21T08:43:00.333Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/financetrackerapp-75842/serviceAccounts/financetrackerapp-75842@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2026-02-21T08:43:00.334Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/financetrackerapp-75842/serviceAccounts/financetrackerapp-75842@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2026-02-21T08:43:00.512Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/financetrackerapp-75842/serviceAccounts/financetrackerapp-75842@appspot.gserviceaccount.com:testIamPermissions 200
+[debug] [2026-02-21T08:43:00.512Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/financetrackerapp-75842/serviceAccounts/financetrackerapp-75842@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[info] 
+[info] === Deploying to 'financetrackerapp-75842'...
+[info] 
+[info] i  deploying functions 
+[debug] [2026-02-21T08:43:00.514Z] Checked if tokens are valid: true, expires at: 1771665240210
+[debug] [2026-02-21T08:43:00.514Z] Checked if tokens are valid: true, expires at: 1771665240210
+[debug] [2026-02-21T08:43:00.515Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/financetrackerapp-75842 [none]
+[debug] [2026-02-21T08:43:00.592Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/financetrackerapp-75842 200
+[debug] [2026-02-21T08:43:00.593Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/financetrackerapp-75842 {"projectNumber":"1051498012571","projectId":"financetrackerapp-75842","lifecycleState":"ACTIVE","name":"FinanceTrackerApp","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2025-10-15T03:13:40.234171Z"}
+[info] i  functions: preparing codebase default for deployment 
+[info] i  functions: ensuring required API cloudfunctions.googleapis.com is enabled... 
+[info] i  functions: ensuring required API cloudbuild.googleapis.com is enabled... 
+[debug] [2026-02-21T08:43:00.594Z] Checked if tokens are valid: true, expires at: 1771665240210
+[debug] [2026-02-21T08:43:00.594Z] Checked if tokens are valid: true, expires at: 1771665240210
+[info] i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled... 
+[debug] [2026-02-21T08:43:00.595Z] Checked if tokens are valid: true, expires at: 1771665240210
+[debug] [2026-02-21T08:43:00.595Z] Checked if tokens are valid: true, expires at: 1771665240210
+[debug] [2026-02-21T08:43:00.595Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/financetrackerapp-75842/services/cloudbuild.googleapis.com [none]
+[debug] [2026-02-21T08:43:00.595Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/financetrackerapp-75842/services/cloudbuild.googleapis.com  x-goog-user-project=financetrackerapp-75842
+[debug] [2026-02-21T08:43:00.596Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/financetrackerapp-75842/services/artifactregistry.googleapis.com [none]
+[debug] [2026-02-21T08:43:00.596Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/financetrackerapp-75842/services/artifactregistry.googleapis.com  x-goog-user-project=financetrackerapp-75842
+[debug] [2026-02-21T08:43:00.899Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/financetrackerapp-75842/services/cloudbuild.googleapis.com 200
+[debug] [2026-02-21T08:43:00.900Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/financetrackerapp-75842/services/cloudbuild.googleapis.com [omitted]
+[warn] !  functions: missing required API cloudbuild.googleapis.com. Enabling now... 
+[debug] [2026-02-21T08:43:00.900Z] Checked if tokens are valid: true, expires at: 1771665240210
+[debug] [2026-02-21T08:43:00.900Z] Checked if tokens are valid: true, expires at: 1771665240210
+[debug] [2026-02-21T08:43:00.901Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1/projects/financetrackerapp-75842/services/cloudbuild.googleapis.com:enable [none]
+[debug] [2026-02-21T08:43:00.901Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1/projects/financetrackerapp-75842/services/cloudbuild.googleapis.com:enable  x-goog-user-project=financetrackerapp-75842
+[debug] [2026-02-21T08:43:00.942Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/financetrackerapp-75842/services/artifactregistry.googleapis.com 200
+[debug] [2026-02-21T08:43:00.942Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/financetrackerapp-75842/services/artifactregistry.googleapis.com [omitted]
+[warn] !  artifactregistry: missing required API artifactregistry.googleapis.com. Enabling now... 
+[debug] [2026-02-21T08:43:00.942Z] Checked if tokens are valid: true, expires at: 1771665240210
+[debug] [2026-02-21T08:43:00.942Z] Checked if tokens are valid: true, expires at: 1771665240210
+[debug] [2026-02-21T08:43:00.942Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1/projects/financetrackerapp-75842/services/artifactregistry.googleapis.com:enable [none]
+[debug] [2026-02-21T08:43:00.942Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1/projects/financetrackerapp-75842/services/artifactregistry.googleapis.com:enable  x-goog-user-project=financetrackerapp-75842
+[debug] [2026-02-21T08:43:01.157Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1/projects/financetrackerapp-75842/services/cloudbuild.googleapis.com:enable 400
+[debug] [2026-02-21T08:43:01.157Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1/projects/financetrackerapp-75842/services/cloudbuild.googleapis.com:enable [omitted]
+[error] 
+[error] Error: Your project financetrackerapp-75842 must be on the Blaze (pay-as-you-go) plan to complete this command. Required API cloudbuild.googleapis.com can't be enabled until the upgrade is complete. To upgrade, visit the following URL:
+
+https://console.firebase.google.com/project/financetrackerapp-75842/usage/details
+[debug] [2026-02-21T08:43:01.188Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1/projects/financetrackerapp-75842/services/artifactregistry.googleapis.com:enable 400
+[debug] [2026-02-21T08:43:01.189Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1/projects/financetrackerapp-75842/services/artifactregistry.googleapis.com:enable [omitted]
